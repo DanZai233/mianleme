@@ -4,7 +4,7 @@
   "outputDirectory": "dist",
   "functions": {
     "dist/server.cjs": {
-      "runtime": "@vercel/node@3"
+      "runtime": "@vercel/node@3.2.15"
     }
   },
   "routes": [
