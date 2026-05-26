@@ -3,14 +3,14 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "dist/server.cjs": {
+    "api/handler.ts": {
       "runtime": "@vercel/node@3.2.15"
     }
   },
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "dist/server.cjs"
+      "src": "/api/parse-interview",
+      "dest": "/api/handler.ts"
     },
     {
       "src": "/(.*)",
