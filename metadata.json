@@ -1,0 +1,6 @@
+{
+  "name": "面了么 (MianLeMe)",
+  "description": "Multi-platform interview schedule manager with push notifications, smart ICS calendar extraction, dark mode, multi-language, and Gemini API integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

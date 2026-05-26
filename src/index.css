@@ -1,0 +1,47 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#F2F2F7] text-black antialiased dark:bg-[#000000] dark:text-white transition-colors duration-300;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+  .ios-card {
+    @apply bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-[0_2px_10px_rgb(0,0,0,0.03)] dark:shadow-none;
+  }
+  .ios-glass {
+    @apply bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-xl border-t border-gray-200/50 dark:border-white/10;
+  }
+}
+
+@keyframes slideUpNative {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeInNative {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-slide-up-native {
+  animation: slideUpNative 0.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-fade-in-native {
+  animation: fadeInNative 0.3s ease-out forwards;
+}
