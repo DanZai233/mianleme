@@ -10,10 +10,9 @@ import { Toaster, toast } from 'react-hot-toast';
 import { format, isSameDay, addDays, subDays, eachDayOfInterval, isToday } from 'date-fns';
 
 export default function App() {
-  const { state, addInterview, updateInterview, deleteInterview, setLanguage, importData } = useAppState();
+  const { state, addInterview, updateInterview, deleteInterview, setLanguage, importData, setDarkMode, setNotificationsEnabled, setModelConfig } = useAppState();
   const t = useI18n(state.language);
   
-  const [darkMode, setDarkMode] = useState(true);
   const [search, setSearch] = useState('');
   
   // App modes: 'list' (all upcoming), 'calendar' (selected date), 'history' (archived/completed)
@@ -23,25 +22,23 @@ export default function App() {
   const [editingData, setEditingData] = useState<Interview | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   useEffect(() => {
-    if (darkMode) {
+    if (state.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [darkMode]);
+  }, [state.darkMode]);
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "granted") {
       setNotificationsEnabled(true);
     }
-  }, []);
+  }, [setNotificationsEnabled]);
 
   useEffect(() => {
-    if (!notificationsEnabled) return;
+    if (!state.notificationsEnabled) return;
     const checkNotifications = () => {
       const now = new Date().getTime();
       state.interviews.forEach(interview => {
@@ -59,7 +56,7 @@ export default function App() {
     };
     const interval = setInterval(checkNotifications, 60000);
     return () => clearInterval(interval);
-  }, [state.interviews, notificationsEnabled, t]);
+  }, [state.interviews, state.notificationsEnabled, t]);
 
   const requestNotifications = () => {
     if ("Notification" in window) {
@@ -190,7 +187,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: darkMode ? '#1C1C1E' : '#FFFFFF', color: darkMode ? '#FFFFFF' : '#000000' } }} />
+      <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: state.darkMode ? '#1C1C1E' : '#FFFFFF', color: state.darkMode ? '#FFFFFF' : '#000000' } }} />
       
       {/* iOS Style Large Header */}
       <header className="px-5 pt-12 pb-4 sticky top-0 bg-[#F2F2F7]/90 dark:bg-[#000000]/90 backdrop-blur-2xl z-20 border-b border-gray-200/50 dark:border-white/10">
@@ -368,6 +365,7 @@ export default function App() {
           initialData={editingData} 
           lang={state.language} 
           existingInterviews={state.interviews}
+          modelConfig={state.modelConfig}
           onClose={() => setIsModalOpen(false)} 
           onSave={(data) => {
             if (editingData) {
@@ -388,12 +386,14 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         lang={state.language}
         setLang={setLanguage}
-        darkMode={darkMode}
+        darkMode={state.darkMode}
         setDarkMode={setDarkMode}
-        notificationsEnabled={notificationsEnabled}
+        notificationsEnabled={state.notificationsEnabled}
         requestNotifications={requestNotifications}
         onExport={handleExport}
         onImport={handleImport}
+        modelConfig={state.modelConfig}
+        setModelConfig={setModelConfig}
       />
 
     </div>

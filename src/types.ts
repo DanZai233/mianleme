@@ -15,7 +15,19 @@ export interface Interview {
 
 export type Language = "en" | "zh";
 
+export type ModelProvider = "google" | "volcengine" | "openai" | "anthropic";
+
+export interface ModelConfig {
+  provider: ModelProvider;
+  apiKey: string;
+  modelName: string;
+  apiBase?: string;
+}
+
 export interface AppState {
   interviews: Interview[];
   language: Language;
+  darkMode: boolean;
+  notificationsEnabled: boolean;
+  modelConfig: ModelConfig;
 }

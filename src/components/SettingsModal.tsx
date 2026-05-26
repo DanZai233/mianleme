@@ -1,7 +1,8 @@
-import React from 'react';
-import { X, Moon, Sun, Globe, Download, Upload, Bell, ChevronRight, Check } from 'lucide-react';
-import { Language } from '../types';
+import React, { useState } from 'react';
+import { X, Moon, Sun, Globe, Download, Upload, Bell, ChevronRight, Check, Brain } from 'lucide-react';
+import { Language, ModelConfig, ModelProvider } from '../types';
 import { useI18n } from '../i18n';
+import toast from 'react-hot-toast';
 
 interface Props {
   isOpen: boolean;
@@ -14,13 +15,24 @@ interface Props {
   requestNotifications: () => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  modelConfig: ModelConfig;
+  setModelConfig: (config: Partial<ModelConfig>) => void;
 }
 
 export function SettingsModal({
   isOpen, onClose, lang, setLang, darkMode, setDarkMode,
-  notificationsEnabled, requestNotifications, onExport, onImport
+  notificationsEnabled, requestNotifications, onExport, onImport,
+  modelConfig, setModelConfig
 }: Props) {
   const t = useI18n(lang);
+  const [localModelConfig, setLocalModelConfig] = useState<ModelConfig>(modelConfig);
+  const [showAiSettings, setShowAiSettings] = useState(false);
+
+  const handleSaveModelConfig = () => {
+    setModelConfig(localModelConfig);
+    toast.success(t.modelConfigSaved);
+    setShowAiSettings(false);
+  };
 
   if (!isOpen) return null;
 
@@ -117,6 +129,96 @@ export function SettingsModal({
                 <ChevronRight size={18} className="text-gray-400" />
                 <input type="file" accept=".json" className="hidden" onChange={onImport} />
               </label>
+
+            </div>
+          </div>
+
+          {/* AI Model Settings Group */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-4 mb-2">{t.aiModelSettings}</h3>
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl overflow-hidden shadow-sm dark:shadow-none text-[15px]">
+              
+              {!showAiSettings ? (
+                <button onClick={() => {
+                  setLocalModelConfig(modelConfig);
+                  setShowAiSettings(true);
+                }} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center text-white"><Brain size={18} /></div>
+                    <span className="font-medium text-black dark:text-white">{t.aiModelSettings}</span>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-400" />
+                </button>
+              ) : (
+                <div className="p-4 space-y-4">
+                  {/* Provider Select */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.modelProvider}</label>
+                    <select
+                      value={localModelConfig.provider}
+                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, provider: e.target.value as ModelProvider })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value="google">{t.google}</option>
+                      <option value="volcengine">{t.volcengine}</option>
+                      <option value="openai">{t.openai}</option>
+                      <option value="anthropic">{t.anthropic}</option>
+                    </select>
+                  </div>
+
+                  {/* API Key */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.apiKey}</label>
+                    <input
+                      type="password"
+                      value={localModelConfig.apiKey}
+                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, apiKey: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      placeholder="sk-..."
+                    />
+                  </div>
+
+                  {/* Model Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.modelName}</label>
+                    <input
+                      type="text"
+                      value={localModelConfig.modelName}
+                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, modelName: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      placeholder="gemini-2.5-flash"
+                    />
+                  </div>
+
+                  {/* API Base */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.apiBase}</label>
+                    <input
+                      type="text"
+                      value={localModelConfig.apiBase || ''}
+                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, apiBase: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      placeholder="https://ark.cn-beijing.volces.com/api/v3"
+                    />
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => setShowAiSettings(false)}
+                      className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    >
+                      {t.cancel}
+                    </button>
+                    <button
+                      onClick={handleSaveModelConfig}
+                      className="flex-1 px-4 py-2 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition-colors"
+                    >
+                      {t.saveModelConfig}
+                    </button>
+                  </div>
+                </div>
+              )}
 
             </div>
           </div>

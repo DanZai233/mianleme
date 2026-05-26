@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "dist/server.cjs": {
+      "runtime": "@vercel/node@3"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "dist/server.cjs"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "dist/$1"
+    }
+  ],
+  "installCommand": "npm install"
+}

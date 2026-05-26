@@ -1,11 +1,18 @@
 import { useState, useEffect } from "react";
-import { AppState, Interview, Language } from "./types";
+import { AppState, Interview, Language, ModelConfig } from "./types";
 
 const STORAGE_KEY = "interview_tracker_data";
 
 const defaultState: AppState = {
   interviews: [],
   language: "zh",
+  darkMode: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
+  notificationsEnabled: false,
+  modelConfig: {
+    provider: "google",
+    apiKey: "",
+    modelName: "gemini-2.5-flash",
+  }
 };
 
 export function useAppState() {
@@ -50,6 +57,18 @@ export function useAppState() {
     setState((s) => ({ ...s, language: lang }));
   };
 
+  const setDarkMode = (darkMode: boolean) => {
+    setState((s) => ({ ...s, darkMode }));
+  };
+
+  const setNotificationsEnabled = (enabled: boolean) => {
+    setState((s) => ({ ...s, notificationsEnabled: enabled }));
+  };
+
+  const setModelConfig = (config: Partial<ModelConfig>) => {
+    setState((s) => ({ ...s, modelConfig: { ...s.modelConfig, ...config } }));
+  };
+
   const importData = (data: AppState) => {
     setState(data);
   };
@@ -60,6 +79,9 @@ export function useAppState() {
     updateInterview,
     deleteInterview,
     setLanguage,
+    setDarkMode,
+    setNotificationsEnabled,
+    setModelConfig,
     importData,
   };
 }

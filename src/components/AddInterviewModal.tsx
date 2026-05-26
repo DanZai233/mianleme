@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Interview, Language } from '../types';
+import { Interview, Language, ModelConfig } from '../types';
 import { useI18n } from '../i18n';
 import { v4 as uuidv4 } from 'uuid';
 import { X, Sparkles, Image as ImageIcon, Loader2 } from 'lucide-react';
@@ -11,9 +11,10 @@ interface Props {
   onClose: () => void;
   onSave: (i: Interview) => void;
   existingInterviews: Interview[];
+  modelConfig: ModelConfig;
 }
 
-export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews }: Props) {
+export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, modelConfig }: Props) {
   const t = useI18n(lang);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -66,7 +67,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       const res = await fetch('/api/parse-interview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, imageBase64 })
+        body: JSON.stringify({ text, imageBase64, modelConfig })
       });
       if (!res.ok) {
         if (res.status === 429) {
