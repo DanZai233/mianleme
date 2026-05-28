@@ -1,13 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppState } from './store';
 import { useI18n } from './i18n';
-import { Interview } from './types';
+import { Interview, InterviewResult, Language } from './types';
 import { InterviewCard } from './components/InterviewCard';
 import { AddInterviewModal } from './components/AddInterviewModal';
 import { SettingsModal } from './components/SettingsModal';
-import { Plus, Search, Settings, Calendar as CalendarIcon, List, LayoutList } from 'lucide-react';
+import { Bell, CheckCircle2, MessageSquare, Plus, Search, Settings, Calendar as CalendarIcon, List, LayoutList } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { format, isSameDay, addDays, subDays, eachDayOfInterval, isToday } from 'date-fns';
+import { formatDateTimeForTimezone } from './utils';
+
+const NOTIFICATION_SENT_KEY = 'interview_tracker_notifications_sent';
+
+function isFollowUpDue(interview: Interview, now = new Date()) {
+  if (interview.status !== 'completed' || !interview.followUpDate || interview.followUpDone) return false;
+  const followUpTime = new Date(interview.followUpDate).getTime();
+  return !isNaN(followUpTime) && followUpTime <= now.getTime();
+}
+
+function getSentNotificationKeys() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NOTIFICATION_SENT_KEY) || '[]');
+    return new Set<string>(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []);
+  } catch {
+    return new Set<string>();
+  }
+}
 
 export default function App() {
   const { state, addInterview, updateInterview, deleteInterview, setLanguage, setTimezone, importData, setDarkMode, setNotificationsEnabled } = useAppState();
@@ -18,10 +36,21 @@ export default function App() {
   // App modes: 'list' (all upcoming), 'calendar' (selected date), 'history' (archived/completed)
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'history'>('list');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [historyResultFilter, setHistoryResultFilter] = useState<'all' | InterviewResult>('all');
+  const [historyReviewFilter, setHistoryReviewFilter] = useState<'all' | 'withReview' | 'withoutReview' | 'followUpDue'>('all');
+  const [historyMonthFilter, setHistoryMonthFilter] = useState('all');
   
   const [editingData, setEditingData] = useState<Interview | null>(null);
+  const [completingData, setCompletingData] = useState<Interview | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const resultLabels: Record<InterviewResult, string> = {
+    unknown: t.resultUnknown,
+    waiting: t.resultWaiting,
+    offer: t.resultOffer,
+    rejected: t.resultRejected,
+    withdrawn: t.resultWithdrawn,
+  };
 
   useEffect(() => {
     if (state.darkMode) {
@@ -41,18 +70,40 @@ export default function App() {
     if (!state.notificationsEnabled) return;
     const checkNotifications = () => {
       const now = new Date().getTime();
+      const sent = getSentNotificationKeys();
       state.interviews.forEach(interview => {
-        if (interview.status !== 'upcoming') return;
         const d = new Date(interview.date).getTime();
-        if (isNaN(d)) return;
-        const triggerTime = d - (interview.reminderHours * 60 * 60 * 1000);
-        if (Math.abs(now - triggerTime) < 60000) {
+        if (interview.status === 'upcoming' && !isNaN(d)) {
+          const triggerTime = d - (interview.reminderHours * 60 * 60 * 1000);
+          const key = `interview:${interview.id}:${interview.date}:${interview.reminderHours}`;
+          if (now >= triggerTime && now - triggerTime < 60000 && !sent.has(key)) {
+            sent.add(key);
+            new Notification(t.appTitle, {
+              body: `${t.notifyNow} ${interview.company} - ${interview.role}`,
+              icon: '/favicon.ico'
+            });
+          }
+        }
+
+        const followUpTime = new Date(interview.followUpDate).getTime();
+        const followUpKey = `followup:${interview.id}:${interview.followUpDate}`;
+        if (
+          interview.status === 'completed' &&
+          interview.followUpDate &&
+          !interview.followUpDone &&
+          !isNaN(followUpTime) &&
+          now >= followUpTime &&
+          now - followUpTime < 24 * 60 * 60 * 1000 &&
+          !sent.has(followUpKey)
+        ) {
+          sent.add(followUpKey);
           new Notification(t.appTitle, {
-            body: `${t.notifyNow} ${interview.company} - ${interview.role}`,
+            body: `${t.followUpsDue}: ${interview.company} - ${interview.role}`,
             icon: '/favicon.ico'
           });
         }
       });
+      localStorage.setItem(NOTIFICATION_SENT_KEY, JSON.stringify(Array.from(sent).slice(-200)));
     };
     const interval = setInterval(checkNotifications, 60000);
     return () => clearInterval(interval);
@@ -99,13 +150,25 @@ export default function App() {
     let list = state.interviews.filter(i => {
       const matchesSearch = i.company.toLowerCase().includes(search.toLowerCase()) || 
                             i.role.toLowerCase().includes(search.toLowerCase()) ||
-                            i.meetingId.toLowerCase().includes(search.toLowerCase());
+                            i.platform.toLowerCase().includes(search.toLowerCase()) ||
+                            i.meetingId.toLowerCase().includes(search.toLowerCase()) ||
+                            i.notes.toLowerCase().includes(search.toLowerCase()) ||
+                            i.review.toLowerCase().includes(search.toLowerCase());
       if (!matchesSearch) return false;
 
       if (viewMode === 'list') {
         return i.status === 'upcoming';
       } else if (viewMode === 'history') {
-        return i.status !== 'upcoming';
+        if (i.status === 'upcoming') return false;
+        if (historyResultFilter !== 'all' && i.result !== historyResultFilter) return false;
+        if (historyMonthFilter !== 'all') {
+          const time = new Date(i.date).getTime();
+          if (isNaN(time) || format(new Date(time), 'yyyy-MM') !== historyMonthFilter) return false;
+        }
+        if (historyReviewFilter === 'withReview' && !i.review.trim()) return false;
+        if (historyReviewFilter === 'withoutReview' && i.review.trim()) return false;
+        if (historyReviewFilter === 'followUpDue' && !isFollowUpDue(i)) return false;
+        return true;
       } else if (viewMode === 'calendar') {
         return isSameDay(new Date(i.date), selectedDate);
       }
@@ -118,7 +181,7 @@ export default function App() {
     });
 
     return list;
-  }, [state.interviews, search, viewMode, selectedDate]);
+  }, [state.interviews, search, viewMode, selectedDate, historyResultFilter, historyMonthFilter, historyReviewFilter]);
 
   const handleExport = () => {
     const dataStr = JSON.stringify(state, null, 2);
@@ -184,6 +247,22 @@ export default function App() {
     const upcoming = state.interviews.filter(i => i.status === 'upcoming');
     upcoming.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return upcoming.find(i => new Date(i.date).getTime() > new Date().getTime());
+  }, [state.interviews]);
+
+  const dueFollowUps = useMemo(() => (
+    state.interviews
+      .filter(i => isFollowUpDue(i))
+      .sort((a, b) => new Date(a.followUpDate).getTime() - new Date(b.followUpDate).getTime())
+  ), [state.interviews]);
+
+  const historyMonths = useMemo(() => {
+    const months = new Set<string>();
+    state.interviews.forEach((interview) => {
+      if (interview.status === 'upcoming') return;
+      const time = new Date(interview.date).getTime();
+      if (!isNaN(time)) months.add(format(new Date(time), 'yyyy-MM'));
+    });
+    return Array.from(months).sort().reverse();
   }, [state.interviews]);
 
   return (
@@ -300,9 +379,42 @@ export default function App() {
           </div>
         )}
 
+        {viewMode === 'list' && dueFollowUps.length > 0 && (
+          <div className="mb-6 ios-card p-4 border border-amber-200/70 dark:border-amber-400/20 bg-amber-50 dark:bg-amber-500/10">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                  <Bell size={17} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-bold text-amber-700 dark:text-amber-300 uppercase">{t.followUpsDue}</p>
+                  <p className="text-sm text-amber-800/80 dark:text-amber-100/80 truncate">{dueFollowUps.length} {t.followUps}</p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {dueFollowUps.slice(0, 3).map((interview) => (
+                <div key={interview.id} className="flex items-center justify-between gap-3 rounded-2xl bg-white/80 dark:bg-black/25 p-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-black dark:text-white truncate">{interview.company} - {interview.role}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{format(new Date(interview.followUpDate), 'yyyy-MM-dd HH:mm')}</p>
+                  </div>
+                  <button
+                    onClick={() => updateInterview(interview.id, { followUpDone: true })}
+                    className="min-h-9 shrink-0 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white active:scale-95 transition-transform"
+                  >
+                    {t.markFollowedUp}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Overview Stats (only shown in history mode) */}
         {viewMode === 'history' && (
-          <div className="mb-6 grid grid-cols-3 gap-3">
+          <>
+          <div className="mb-4 grid grid-cols-3 gap-3">
              <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl flex flex-col items-center justify-center shadow-[0_2px_10px_rgb(0,0,0,0.03)] dark:shadow-none">
                 <span className="text-2xl font-bold text-black dark:text-white mb-1">{state.interviews.length}</span>
                 <span className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase text-center">{t.total}</span>
@@ -315,11 +427,32 @@ export default function App() {
              </div>
              <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-3xl flex flex-col items-center justify-center">
                 <span className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
-                  {state.interviews.filter(i => i.status === 'upcoming').length}
+                  {dueFollowUps.length}
                 </span>
-                <span className="text-[10px] sm:text-xs font-semibold text-blue-600/70 dark:text-blue-400/70 uppercase text-center">{t.upcoming}</span>
+                <span className="text-[10px] sm:text-xs font-semibold text-blue-600/70 dark:text-blue-400/70 uppercase text-center">{t.followUpsDue}</span>
              </div>
           </div>
+          <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <select value={historyResultFilter} onChange={(e) => setHistoryResultFilter(e.target.value as 'all' | InterviewResult)} className="min-h-11 rounded-2xl bg-white dark:bg-[#1C1C1E] px-3 text-sm font-semibold text-black dark:text-white outline-none">
+              <option value="all">{t.allResults}</option>
+              {Object.entries(resultLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <select value={historyReviewFilter} onChange={(e) => setHistoryReviewFilter(e.target.value as 'all' | 'withReview' | 'withoutReview' | 'followUpDue')} className="min-h-11 rounded-2xl bg-white dark:bg-[#1C1C1E] px-3 text-sm font-semibold text-black dark:text-white outline-none">
+              <option value="all">{t.allReviews}</option>
+              <option value="withReview">{t.withReview}</option>
+              <option value="withoutReview">{t.withoutReview}</option>
+              <option value="followUpDue">{t.dueFollowUps}</option>
+            </select>
+            <select value={historyMonthFilter} onChange={(e) => setHistoryMonthFilter(e.target.value)} className="min-h-11 rounded-2xl bg-white dark:bg-[#1C1C1E] px-3 text-sm font-semibold text-black dark:text-white outline-none">
+              <option value="all">{t.allMonths}</option>
+              {historyMonths.map(month => (
+                <option key={month} value={month}>{month}</option>
+              ))}
+            </select>
+          </div>
+          </>
         )}
 
         {/* List Content */}
@@ -333,9 +466,9 @@ export default function App() {
                 timezone={state.timezone}
                 onEdit={(i) => { setEditingData(i); setIsModalOpen(true); }}
                 onComplete={(i) => {
-                  updateInterview(i.id, { ...i, status: 'completed' });
-                  toast.success(t.completed);
+                  setCompletingData(i);
                 }}
+                onUpdate={(id, updates) => updateInterview(id, updates)}
                 onDelete={deleteInterview}
                 hasConflict={hasConflict(interview)}
               />
@@ -346,7 +479,7 @@ export default function App() {
                  <CalendarIcon size={24} className="text-gray-400" />
               </div>
               <p className="text-gray-500 font-medium">
-                {viewMode === 'calendar' ? t.noInterviewsToday : t.noInterviews}
+                {viewMode === 'calendar' ? t.noInterviewsToday : viewMode === 'history' ? t.noHistoryMatches : t.noInterviews}
               </p>
             </div>
           )}
@@ -382,6 +515,20 @@ export default function App() {
         />
       )}
 
+      {completingData && (
+        <CompletionModal
+          interview={completingData}
+          lang={state.language}
+          timezone={state.timezone}
+          onClose={() => setCompletingData(null)}
+          onSave={(updates) => {
+            updateInterview(completingData.id, updates);
+            toast.success(t.reviewSaved);
+            setCompletingData(null);
+          }}
+        />
+      )}
+
       {/* Settings Modal Extracted */}
       <SettingsModal 
         isOpen={isSettingsOpen}
@@ -398,6 +545,109 @@ export default function App() {
         onImport={handleImport}
       />
 
+    </div>
+  );
+}
+
+function CompletionModal({
+  interview,
+  lang,
+  timezone,
+  onClose,
+  onSave,
+}: {
+  interview: Interview;
+  lang: Language;
+  timezone: string;
+  onClose: () => void;
+  onSave: (updates: Partial<Interview>) => void;
+}) {
+  const t = useI18n(lang);
+  const resultLabels: Record<InterviewResult, string> = {
+    unknown: t.resultUnknown,
+    waiting: t.resultWaiting,
+    offer: t.resultOffer,
+    rejected: t.resultRejected,
+    withdrawn: t.resultWithdrawn,
+  };
+  const defaultFollowUp = interview.followUpDate || formatDateTimeForTimezone(addDays(new Date(), 3), timezone);
+  const [result, setResult] = useState<InterviewResult>(interview.result === 'unknown' ? 'waiting' : interview.result);
+  const [review, setReview] = useState(interview.review || '');
+  const [followUpDate, setFollowUpDate] = useState(defaultFollowUp);
+
+  const save = (includeReview: boolean) => {
+    onSave({
+      status: 'completed',
+      result: includeReview ? result : interview.result,
+      review: includeReview ? review : interview.review,
+      followUpDate: includeReview ? followUpDate : interview.followUpDate,
+      followUpDone: includeReview ? false : interview.followUpDone,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="absolute inset-0 bg-black/40 dark:bg-black/60 animate-fade-in-native" onClick={onClose} />
+      <section className="relative z-10 w-full max-w-lg bg-white dark:bg-[#1C1C1E] sm:rounded-3xl rounded-t-[32px] shadow-2xl overflow-hidden animate-slide-up-native">
+        <div className="p-5 border-b border-gray-100 dark:border-white/5">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+              <CheckCircle2 size={21} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-black dark:text-white">{t.completionTitle}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mt-1">{t.completionSubtitle}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="rounded-2xl bg-[#F2F2F7] dark:bg-black/40 p-4">
+            <p className="text-sm font-bold text-black dark:text-white truncate">{interview.company} - {interview.role}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{interview.date ? format(new Date(interview.date), 'yyyy-MM-dd HH:mm') : '-'}</p>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.result}</label>
+            <select value={result} onChange={(e) => setResult(e.target.value as InterviewResult)} className="w-full min-h-12 rounded-2xl bg-[#F2F2F7] dark:bg-black/40 px-4 text-sm font-semibold text-black dark:text-white outline-none">
+              {Object.entries(resultLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 flex items-center gap-1">
+              <MessageSquare size={13} /> {t.postInterviewReview}
+            </label>
+            <textarea
+              value={review}
+              onChange={(e) => setReview(e.target.value)}
+              placeholder={lang === 'zh' ? '题目、表现、风险点、需要补充的内容...' : 'Questions, performance, risks, and next steps...'}
+              className="w-full h-28 resize-none rounded-2xl bg-[#F2F2F7] dark:bg-black/40 px-4 py-3 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.followUpDate}</label>
+            <input
+              type="datetime-local"
+              value={followUpDate}
+              onChange={(e) => setFollowUpDate(e.target.value)}
+              className="w-full min-h-12 rounded-2xl bg-[#F2F2F7] dark:bg-black/40 px-4 text-sm font-semibold text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button onClick={() => save(false)} className="min-h-12 rounded-2xl bg-gray-100 dark:bg-white/10 px-3 text-sm font-bold text-gray-700 dark:text-gray-200 active:scale-[0.99] transition-transform">
+              {t.skipReview}
+            </button>
+            <button onClick={() => save(true)} className="min-h-12 rounded-2xl bg-emerald-500 px-3 text-sm font-bold text-white active:scale-[0.99] transition-transform">
+              {t.completeAndSave}
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

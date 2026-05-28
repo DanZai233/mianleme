@@ -3,6 +3,7 @@ import { AppState, Interview, Language } from "./types";
 import { getBrowserTimezone } from "./utils";
 
 const STORAGE_KEY = "interview_tracker_data";
+const INTERVIEW_RESULTS = new Set(["unknown", "waiting", "offer", "rejected", "withdrawn"]);
 
 const defaultState: AppState = {
   interviews: [],
@@ -13,6 +14,8 @@ const defaultState: AppState = {
 };
 
 function normalizeInterview(interview: Partial<Interview>): Interview {
+  const result = typeof interview.result === "string" && INTERVIEW_RESULTS.has(interview.result) ? interview.result : "unknown";
+
   return {
     id: String(interview.id || `${Date.now()}-${Math.random()}`),
     company: String(interview.company || ""),
@@ -22,6 +25,10 @@ function normalizeInterview(interview: Partial<Interview>): Interview {
     link: String(interview.link || ""),
     meetingId: String(interview.meetingId || ""),
     notes: String(interview.notes || ""),
+    review: String(interview.review || ""),
+    result: result as Interview["result"],
+    followUpDate: String(interview.followUpDate || ""),
+    followUpDone: Boolean(interview.followUpDone),
     status: interview.status || "upcoming",
     reminderHours: Number.isFinite(Number(interview.reminderHours)) ? Number(interview.reminderHours) : 1,
     durationMinutes: Number.isFinite(Number(interview.durationMinutes)) ? Number(interview.durationMinutes) : 60,

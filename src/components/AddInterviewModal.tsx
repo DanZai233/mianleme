@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Interview, Language } from '../types';
+import { Interview, InterviewResult, Language } from '../types';
 import { useI18n } from '../i18n';
 import { v4 as uuidv4 } from 'uuid';
 import { X, Sparkles, Image as ImageIcon, Loader2 } from 'lucide-react';
@@ -19,6 +19,13 @@ interface Props {
 export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, timezone }: Props) {
   const t = useI18n(lang);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultLabels: Record<InterviewResult, string> = {
+    unknown: t.resultUnknown,
+    waiting: t.resultWaiting,
+    offer: t.resultOffer,
+    rejected: t.resultRejected,
+    withdrawn: t.resultWithdrawn,
+  };
   
   const [formData, setFormData] = useState<Interview>(
     initialData ? { ...initialData, meetingId: initialData.meetingId || '' } : {
@@ -30,6 +37,10 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       link: '',
       meetingId: '',
       notes: '',
+      review: '',
+      result: 'unknown',
+      followUpDate: '',
+      followUpDone: false,
       status: 'upcoming',
       reminderHours: 1,
       durationMinutes: 60,
@@ -241,13 +252,72 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
             <div className="relative">
                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.status}</label>
                <div className="relative">
-                 <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as Interview['status']})} className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none appearance-none">
+                 <select
+                    value={formData.status}
+                    onChange={e => {
+                      const status = e.target.value as Interview['status'];
+                      setFormData(prev => ({
+                        ...prev,
+                        status,
+                        result: status === 'upcoming' ? 'unknown' : prev.result,
+                      }));
+                    }}
+                    className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none appearance-none"
+                  >
                     <option value="upcoming">{t.upcoming}</option>
                     <option value="completed">{t.completed}</option>
                     <option value="archived">{t.archived}</option>
                  </select>
                </div>
             </div>
+
+            {(formData.status !== 'upcoming' || formData.review || formData.followUpDate || formData.result !== 'unknown') && (
+              <div className="bg-white/70 dark:bg-white/5 rounded-3xl p-4 space-y-4 border border-white/70 dark:border-white/10">
+                <div className="relative">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.result}</label>
+                  <select
+                    value={formData.result}
+                    onChange={e => setFormData({...formData, result: e.target.value as InterviewResult})}
+                    className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none appearance-none"
+                  >
+                    {Object.entries(resultLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.postInterviewReview}</label>
+                  <textarea
+                    value={formData.review}
+                    onChange={e => setFormData({...formData, review: e.target.value})}
+                    placeholder={lang === 'zh' ? '记录面试感受、题目、表现和下一步...' : 'Notes on questions, performance, and next steps...'}
+                    className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none h-28 resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                  <div className="relative">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.followUpDate}</label>
+                    <input
+                      type="datetime-local"
+                      value={formData.followUpDate}
+                      onChange={e => setFormData({...formData, followUpDate: e.target.value, followUpDone: false})}
+                      className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none appearance-none"
+                    />
+                  </div>
+                  <label className="min-h-12 bg-white dark:bg-[#1C1C1E] rounded-2xl px-4 py-3 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm dark:shadow-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.followUpDone}
+                      onChange={e => setFormData({...formData, followUpDone: e.target.checked})}
+                      className="w-4 h-4 accent-blue-500"
+                    />
+                    {t.followUpDone}
+                  </label>
+                </div>
+              </div>
+            )}
 
             <div className="relative">
               <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.notes}</label>

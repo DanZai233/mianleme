@@ -1,4 +1,5 @@
 export type InterviewStatus = "upcoming" | "completed" | "archived";
+export type InterviewResult = "unknown" | "waiting" | "offer" | "rejected" | "withdrawn";
 
 export interface Interview {
   id: string;
@@ -9,6 +10,10 @@ export interface Interview {
   link: string;
   meetingId: string;
   notes: string;
+  review: string;
+  result: InterviewResult;
+  followUpDate: string;
+  followUpDone: boolean;
   status: InterviewStatus;
   reminderHours: number; // e.g., 1 for 1 hour before
   durationMinutes: number; // e.g., 60 for 1 hour

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Interview, Language } from '../types';
+import { Interview, InterviewResult, Language } from '../types';
 import { useI18n } from '../i18n';
 import { addToSystemCalendar, createGoogleCalendarUrl } from '../utils';
 import {
@@ -26,6 +26,7 @@ interface Props {
   timezone: string;
   onEdit: (i: Interview) => void;
   onComplete?: (i: Interview) => void;
+  onUpdate: (id: string, updates: Partial<Interview>) => void;
   onDelete: (id: string) => void;
   hasConflict?: boolean;
 }
@@ -50,18 +51,29 @@ function stopEvent(event: React.MouseEvent) {
   event.stopPropagation();
 }
 
-export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, onDelete, hasConflict = false }: Props) {
+export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, onUpdate, onDelete, hasConflict = false }: Props) {
   const t = useI18n(lang);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const resultLabels: Record<InterviewResult, string> = {
+    unknown: t.resultUnknown,
+    waiting: t.resultWaiting,
+    offer: t.resultOffer,
+    rejected: t.resultRejected,
+    withdrawn: t.resultWithdrawn,
+  };
 
   const d = new Date(interview.date);
   const hasValidDate = !isNaN(d.getTime());
   const formattedTime = hasValidDate ? format(d, 'HH:mm') : '--:--';
   const formattedDate = hasValidDate ? format(d, 'EEE, MMM d') : '-';
   const fullDate = hasValidDate ? format(d, 'yyyy-MM-dd HH:mm') : interview.date;
+  const followUpTime = new Date(interview.followUpDate);
+  const hasFollowUp = interview.status === 'completed' && interview.followUpDate && !isNaN(followUpTime.getTime());
+  const isFollowUpDue = Boolean(hasFollowUp && !interview.followUpDone && followUpTime.getTime() <= Date.now());
   const description = [
     interview.notes,
+    interview.review ? `${t.postInterviewReview}: ${interview.review}` : '',
     interview.link ? `${t.link}: ${interview.link}` : '',
     interview.meetingId ? `${t.meetingId}: ${interview.meetingId}` : '',
   ].filter(Boolean).join('\n') || 'Interview Notes';
@@ -129,11 +141,17 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
     event?.stopPropagation();
     try {
       if (!hasValidDate) throw new Error('Invalid calendar date');
-      toast.success(t.calendarOpened);
-      await addToSystemCalendar(calendarEvent);
+      const result = await addToSystemCalendar(calendarEvent);
+      toast.success(result === 'native' ? t.calendarAdded : t.calendarFileDownloaded);
       setShowCalendarOptions(false);
-    } catch {
-      toast.error(t.invalidCalendarDate);
+    } catch (error: any) {
+      if (error?.message === 'calendar-permission-denied') {
+        toast.error(t.calendarPermissionDenied);
+      } else if (error?.message === 'calendar-unavailable') {
+        toast.error(t.calendarUnavailable);
+      } else {
+        toast.error(t.invalidCalendarDate);
+      }
     }
   };
 
@@ -211,6 +229,39 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
               </p>
             )}
 
+            {interview.status !== 'upcoming' && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                <span className="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                  {resultLabels[interview.result || 'unknown']}
+                </span>
+                {hasFollowUp && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onUpdate(interview.id, { followUpDone: true });
+                      toast.success(t.markFollowedUp);
+                    }}
+                    disabled={interview.followUpDone}
+                    className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-colors ${
+                      interview.followUpDone
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                        : isFollowUpDue
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                          : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
+                    }`}
+                  >
+                    {interview.followUpDone ? t.followUpDone : `${t.followUpDate}: ${format(followUpTime, 'MM-dd HH:mm')}`}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {interview.review && (
+              <p className="text-[13px] text-gray-700 dark:text-gray-300 bg-emerald-50 dark:bg-emerald-500/10 p-3 rounded-xl mb-3 line-clamp-3 leading-relaxed">
+                {interview.review}
+              </p>
+            )}
+
             <div className="flex justify-between items-center mt-1">
               <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${
                 interview.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' :
@@ -261,6 +312,7 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
             onGoogleCalendar: handleGoogleCalendar,
             onSystemCalendar: handleSystemCalendar,
           }}
+          onUpdate={(updates) => onUpdate(interview.id, updates)}
           onClose={() => setIsDetailsOpen(false)}
           onCopyMeetingId={handleCopyMeetingId}
           onEdit={() => {
@@ -282,14 +334,24 @@ interface DetailsProps {
     onGoogleCalendar: (event?: React.MouseEvent) => void;
     onSystemCalendar: (event?: React.MouseEvent) => void;
   };
+  onUpdate: (updates: Partial<Interview>) => void;
   onClose: () => void;
   onCopyMeetingId: (event?: React.MouseEvent) => void;
   onEdit: () => void;
   onShare: (event?: React.MouseEvent) => void;
 }
 
-function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onClose, onCopyMeetingId, onEdit, onShare }: DetailsProps) {
+function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onUpdate, onClose, onCopyMeetingId, onEdit, onShare }: DetailsProps) {
   const t = useI18n(lang);
+  const resultLabels: Record<InterviewResult, string> = {
+    unknown: t.resultUnknown,
+    waiting: t.resultWaiting,
+    offer: t.resultOffer,
+    rejected: t.resultRejected,
+    withdrawn: t.resultWithdrawn,
+  };
+  const followUpTime = new Date(interview.followUpDate);
+  const hasFollowUp = interview.status === 'completed' && interview.followUpDate && !isNaN(followUpTime.getTime());
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
@@ -344,6 +406,34 @@ function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onC
             <div className="rounded-2xl bg-[#F2F2F7] dark:bg-black/40 p-4">
               <p className="text-[11px] font-bold uppercase text-gray-500 mb-2">{t.notes}</p>
               <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-300">{interview.notes}</p>
+            </div>
+          )}
+
+          {interview.status !== 'upcoming' && (
+            <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 p-4">
+              <p className="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300 mb-2">{t.result}</p>
+              <p className="text-sm font-bold text-black dark:text-white">{resultLabels[interview.result || 'unknown']}</p>
+              {interview.review && (
+                <div className="mt-3">
+                  <p className="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300 mb-1">{t.postInterviewReview}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-300">{interview.review}</p>
+                </div>
+              )}
+              {hasFollowUp && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/80 dark:bg-black/20 p-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase text-gray-500">{t.followUpDate}</p>
+                    <p className="text-sm font-semibold text-black dark:text-white">{format(followUpTime, 'yyyy-MM-dd HH:mm')}</p>
+                  </div>
+                  <button
+                    onClick={() => onUpdate({ followUpDone: true })}
+                    disabled={interview.followUpDone}
+                    className="min-h-9 shrink-0 rounded-xl bg-emerald-500 disabled:bg-gray-300 dark:disabled:bg-white/10 px-3 py-2 text-xs font-bold text-white disabled:text-gray-500"
+                  >
+                    {interview.followUpDone ? t.followUpDone : t.markFollowedUp}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

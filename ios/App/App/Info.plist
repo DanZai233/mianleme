@@ -53,5 +53,9 @@
 	<string>面了么需要访问您的照片图库，以便您主动选择面试邀请截图并使用智能识别功能提取公司、岗位、时间、会议链接等信息。除您选择的图片外，应用不会读取其他照片。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>当您从系统选图界面选择拍照时，面了么会使用摄像头拍摄一张面试邀请截图，用于智能识别面试信息。若您只手动输入或从相册选择图片，则不会使用相机。</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>面了么需要写入日历权限，以便在您点击加入日历时将面试时间、会议链接和提醒添加到系统日历。应用不会读取或分析您的其他日历事件。</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>面了么需要访问日历权限，以便将您确认的面试日程添加到系统日历并设置提醒。</string>
 </dict>
 </plist>

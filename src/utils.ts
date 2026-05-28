@@ -1,15 +1,35 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import {
   CalendarEventInput,
   createCalendarEndpointUrl,
   createGoogleCalendarUrl,
   createICS,
+  getCalendarEventDates,
 } from "./calendar";
 import { apiUrl } from "./api";
 
 export { createGoogleCalendarUrl, createICS };
 export type { CalendarEventInput };
+
+type CalendarAddResult = "native" | "browser";
+
+interface NativeCalendarEvent {
+  title: string;
+  notes: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+  reminderMinutes: number;
+}
+
+interface NativeCalendarPlugin {
+  addEvent(options: NativeCalendarEvent): Promise<{ eventIdentifier?: string }>;
+}
+
+const NativeCalendar = registerPlugin<NativeCalendarPlugin>("NativeCalendar");
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,13 +88,36 @@ export function normalizeExtractedDate(dateValue: unknown, timezone: string) {
   return "";
 }
 
-export async function addToSystemCalendar(event: CalendarEventInput) {
+export async function addToSystemCalendar(event: CalendarEventInput): Promise<CalendarAddResult> {
+  const { startDate, endDate } = getCalendarEventDates(event);
+
+  if (Capacitor.getPlatform() === "ios" && Capacitor.isNativePlatform()) {
+    try {
+      await NativeCalendar.addEvent({
+        title: event.title,
+        notes: event.description,
+        location: event.location,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        timezone: event.timezone || "",
+        reminderMinutes: Math.max(0, Math.round((event.reminderHours || 0) * 60)),
+      });
+      return "native";
+    } catch (error: any) {
+      const message = String(error?.message || error || "");
+      if (message.includes("permission") || message.includes("denied")) {
+        throw new Error("calendar-permission-denied");
+      }
+      throw new Error("calendar-unavailable");
+    }
+  }
+
   const calendarUrl = apiUrl(createCalendarEndpointUrl(event));
 
   if (typeof window !== "undefined") {
     window.location.assign(calendarUrl);
-    return "opened";
+    return "browser";
   }
 
-  throw new Error("System calendar is unavailable outside the browser");
+  throw new Error("calendar-unavailable");
 }
