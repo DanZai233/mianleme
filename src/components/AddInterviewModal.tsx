@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Interview, Language, ModelConfig } from '../types';
+import { Interview, Language } from '../types';
 import { useI18n } from '../i18n';
 import { v4 as uuidv4 } from 'uuid';
 import { X, Sparkles, Image as ImageIcon, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateTimeForTimezone, normalizeExtractedDate } from '../utils';
+import { apiUrl } from '../api';
 
 interface Props {
   initialData?: Interview | null;
@@ -12,11 +13,10 @@ interface Props {
   onClose: () => void;
   onSave: (i: Interview) => void;
   existingInterviews: Interview[];
-  modelConfig: ModelConfig;
   timezone: string;
 }
 
-export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, modelConfig, timezone }: Props) {
+export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, timezone }: Props) {
   const t = useI18n(lang);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -67,10 +67,10 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
   const handleExtract = async (text: string, imageBase64?: string) => {
     setIsExtracting(true);
     try {
-      const res = await fetch('/api/parse-interview', {
+      const res = await fetch(apiUrl('/api/parse-interview'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, imageBase64, modelConfig, timezone })
+        body: JSON.stringify({ text, imageBase64, timezone })
       });
       if (!res.ok) {
         const errorBody = await res.json().catch(() => null);

@@ -6,6 +6,7 @@ import {
   createGoogleCalendarUrl,
   createICS,
 } from "./calendar";
+import { apiUrl } from "./api";
 
 export { createGoogleCalendarUrl, createICS };
 export type { CalendarEventInput };
@@ -68,7 +69,7 @@ export function normalizeExtractedDate(dateValue: unknown, timezone: string) {
 }
 
 export async function addToSystemCalendar(event: CalendarEventInput) {
-  const calendarUrl = createCalendarEndpointUrl(event);
+  const calendarUrl = apiUrl(createCalendarEndpointUrl(event));
 
   if (typeof window !== "undefined") {
     window.location.assign(calendarUrl);

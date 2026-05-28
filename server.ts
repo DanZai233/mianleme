@@ -4,19 +4,10 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import fetch from "node-fetch";
 import { calendarEventFromQuery, createICS, sanitizeCalendarFileName } from "./src/calendar";
 import { normalizeParsedInterviewResult } from "./src/parseResult";
 
-// Polyfill fetch for node environments below 18 if needed, but we are assuming node 18+
-// In which case we could just use global fetch, but we'll import it or rely on genai handling it.
-
-const PROVIDER_LABELS: Record<string, string> = {
-  google: "Google Gemini",
-  volcengine: "Volcengine Ark",
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-};
+type AiProvider = "google" | "volcengine" | "openai" | "anthropic";
 
 function firstEnv(names: string[]) {
   for (const name of names) {
@@ -73,38 +64,32 @@ function getDatePartsForTimezone(timezone: string) {
   };
 }
 
-function normalizeModelConfig(rawConfig: any) {
-  const provider = rawConfig?.provider || "google";
-  let modelName = String(rawConfig?.modelName || "").trim();
-
-  if (provider === "volcengine" && modelName === "gemini-2.5-flash") {
-    modelName = "";
-  }
-
-  const envByProvider: Record<string, { keys: string[]; models: string[]; bases: string[]; defaultBase?: string; defaultModel?: string }> = {
+function getServerAiConfig() {
+  const provider = (process.env.MIANLEME_AI_PROVIDER || "volcengine").trim() as AiProvider;
+  const envByProvider: Record<AiProvider, { keys: string[]; models: string[]; bases: string[]; defaultBase?: string; defaultModel?: string }> = {
     google: {
-      keys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-      models: ["GEMINI_MODEL_NAME", "GOOGLE_MODEL_NAME"],
+      keys: ["MIANLEME_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      models: ["MIANLEME_AI_MODEL", "GEMINI_MODEL_NAME", "GOOGLE_MODEL_NAME"],
       bases: [],
       defaultModel: "gemini-2.5-flash",
     },
     volcengine: {
-      keys: ["VOLCENGINE_API_KEY", "ARK_API_KEY"],
-      models: ["VOLCENGINE_MODEL_NAME", "ARK_MODEL", "ARK_MODEL_ID", "ARK_ENDPOINT_ID"],
-      bases: ["VOLCENGINE_API_BASE", "ARK_API_BASE"],
+      keys: ["MIANLEME_AI_API_KEY", "VOLCENGINE_API_KEY", "ARK_API_KEY"],
+      models: ["MIANLEME_AI_MODEL", "VOLCENGINE_MODEL_NAME", "ARK_MODEL", "ARK_MODEL_ID", "ARK_ENDPOINT_ID"],
+      bases: ["MIANLEME_AI_API_BASE", "VOLCENGINE_API_BASE", "ARK_API_BASE"],
       defaultBase: "https://ark.cn-beijing.volces.com/api/v3",
     },
     openai: {
-      keys: ["OPENAI_API_KEY"],
-      models: ["OPENAI_MODEL_NAME"],
-      bases: ["OPENAI_API_BASE"],
+      keys: ["MIANLEME_AI_API_KEY", "OPENAI_API_KEY"],
+      models: ["MIANLEME_AI_MODEL", "OPENAI_MODEL_NAME"],
+      bases: ["MIANLEME_AI_API_BASE", "OPENAI_API_BASE"],
       defaultBase: "https://api.openai.com/v1",
       defaultModel: "gpt-4o-mini",
     },
     anthropic: {
-      keys: ["ANTHROPIC_API_KEY"],
-      models: ["ANTHROPIC_MODEL_NAME"],
-      bases: ["ANTHROPIC_API_BASE"],
+      keys: ["MIANLEME_AI_API_KEY", "ANTHROPIC_API_KEY"],
+      models: ["MIANLEME_AI_MODEL", "ANTHROPIC_MODEL_NAME"],
+      bases: ["MIANLEME_AI_API_BASE", "ANTHROPIC_API_BASE"],
       defaultBase: "https://api.anthropic.com",
       defaultModel: "claude-3-5-sonnet-latest",
     },
@@ -112,26 +97,25 @@ function normalizeModelConfig(rawConfig: any) {
 
   const envConfig = envByProvider[provider];
   if (!envConfig) {
-    throw new Error("Unsupported model provider");
+    throw new Error("智能识别服务配置错误");
   }
 
-  const apiKey = String(rawConfig?.apiKey || "").trim() || firstEnv(envConfig.keys);
-  const apiBase = String(rawConfig?.apiBase || "").trim() || firstEnv(envConfig.bases) || envConfig.defaultBase;
-  modelName = modelName || firstEnv(envConfig.models) || envConfig.defaultModel || "";
+  const apiKey = firstEnv(envConfig.keys);
+  const apiBase = firstEnv(envConfig.bases) || envConfig.defaultBase;
+  const modelName = firstEnv(envConfig.models) || envConfig.defaultModel || "";
 
-  const label = PROVIDER_LABELS[provider] || provider;
   if (!apiKey) {
-    throw new Error(`${label} API key is required`);
+    throw new Error("智能识别服务暂未开放");
   }
   if (!modelName) {
-    throw new Error(`${label} model name is required`);
+    throw new Error("智能识别服务配置错误");
   }
 
   return { provider, apiKey, modelName, apiBase };
 }
 
-async function callModel(modelConfig: any, prompt: string, text: string, imageBase64?: string) {
-  const { provider, apiKey, modelName, apiBase } = normalizeModelConfig(modelConfig);
+async function callModel(prompt: string, text: string, imageBase64?: string) {
+  const { provider, apiKey, modelName, apiBase } = getServerAiConfig();
 
   // Prepare contents
   let contents: any[] = [];
@@ -269,7 +253,7 @@ async function startServer() {
   // API Route for extracting interview details
   app.post("/api/parse-interview", async (req, res) => {
     try {
-      const { text, imageBase64, modelConfig } = req.body;
+      const { text, imageBase64 } = req.body;
       const timezone = normalizeTimezone(req.body?.timezone);
       const timezoneToday = getDatePartsForTimezone(timezone);
 
@@ -303,7 +287,7 @@ Output JSON format strictly:
 }
 `;
 
-      const data = await callModel(modelConfig, prompt, text, imageBase64);
+      const data = await callModel(prompt, text, imageBase64);
       res.json(normalizeParsedInterviewResult(data));
     } catch (error: any) {
       console.error("AI Error:", error);
@@ -311,7 +295,8 @@ Output JSON format strictly:
       if (isQuotaError) {
         return res.status(429).json({ error: "Quota Exceeded" });
       }
-      res.status(500).json({ error: error.message || "Failed to parse interview details" });
+      const message = error?.message || "智能识别服务暂时不可用，请稍后重试";
+      res.status(500).json({ error: message });
     }
   });
 

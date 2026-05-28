@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AppState, Interview, Language, ModelConfig } from "./types";
+import { AppState, Interview, Language } from "./types";
 import { getBrowserTimezone } from "./utils";
 
 const STORAGE_KEY = "interview_tracker_data";
@@ -10,11 +10,6 @@ const defaultState: AppState = {
   timezone: getBrowserTimezone(),
   darkMode: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
   notificationsEnabled: false,
-  modelConfig: {
-    provider: "google",
-    apiKey: "",
-    modelName: "gemini-2.5-flash",
-  }
 };
 
 function normalizeInterview(interview: Partial<Interview>): Interview {
@@ -38,10 +33,6 @@ function normalizeState(data: Partial<AppState>): AppState {
     ...defaultState,
     ...data,
     interviews: Array.isArray(data.interviews) ? data.interviews.map(normalizeInterview) : [],
-    modelConfig: {
-      ...defaultState.modelConfig,
-      ...(data.modelConfig || {}),
-    },
   };
 }
 
@@ -98,10 +89,6 @@ export function useAppState() {
     setState((s) => ({ ...s, notificationsEnabled: enabled }));
   };
 
-  const setModelConfig = (config: Partial<ModelConfig>) => {
-    setState((s) => ({ ...s, modelConfig: { ...s.modelConfig, ...config } }));
-  };
-
   const importData = (data: AppState) => {
     setState(normalizeState(data));
   };
@@ -115,7 +102,6 @@ export function useAppState() {
     setTimezone,
     setDarkMode,
     setNotificationsEnabled,
-    setModelConfig,
     importData,
   };
 }

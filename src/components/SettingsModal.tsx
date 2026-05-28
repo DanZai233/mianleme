@@ -1,39 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, Moon, Sun, Globe, Download, Upload, Bell, ChevronRight, Check, Brain, Clock3 } from 'lucide-react';
-import { Language, ModelConfig, ModelProvider } from '../types';
+import { Language } from '../types';
 import { useI18n } from '../i18n';
-import toast from 'react-hot-toast';
-
-const PROVIDER_DEFAULTS: Record<ModelProvider, { modelName: string; apiBase?: string; apiKeyPlaceholder: string; modelPlaceholder: string; apiBasePlaceholder: string }> = {
-  google: {
-    modelName: 'gemini-2.5-flash',
-    apiKeyPlaceholder: 'AIza...',
-    modelPlaceholder: 'gemini-2.5-flash',
-    apiBasePlaceholder: '',
-  },
-  volcengine: {
-    modelName: '',
-    apiBase: 'https://ark.cn-beijing.volces.com/api/v3',
-    apiKeyPlaceholder: 'ARK_API_KEY',
-    modelPlaceholder: 'ep-... / doubao-seed-1-6-251015',
-    apiBasePlaceholder: 'https://ark.cn-beijing.volces.com/api/v3',
-  },
-  openai: {
-    modelName: 'gpt-4o-mini',
-    apiKeyPlaceholder: 'sk-...',
-    modelPlaceholder: 'gpt-4o-mini',
-    apiBasePlaceholder: 'https://api.openai.com/v1',
-  },
-  anthropic: {
-    modelName: 'claude-3-5-sonnet-latest',
-    apiKeyPlaceholder: 'sk-ant-...',
-    modelPlaceholder: 'claude-3-5-sonnet-latest',
-    apiBasePlaceholder: 'https://api.anthropic.com',
-  },
-};
-
-const KNOWN_DEFAULT_MODELS = new Set(Object.values(PROVIDER_DEFAULTS).map((item) => item.modelName).filter(Boolean));
-const KNOWN_DEFAULT_BASES = new Set(Object.values(PROVIDER_DEFAULTS).map((item) => item.apiBase).filter(Boolean));
 
 const FALLBACK_TIMEZONES = [
   'Asia/Shanghai',
@@ -69,41 +37,16 @@ interface Props {
   requestNotifications: () => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  modelConfig: ModelConfig;
-  setModelConfig: (config: Partial<ModelConfig>) => void;
 }
 
 export function SettingsModal({
   isOpen, onClose, lang, setLang, darkMode, setDarkMode,
   notificationsEnabled, requestNotifications, onExport, onImport,
-  modelConfig, setModelConfig, timezone, setTimezone
+  timezone, setTimezone
 }: Props) {
   const t = useI18n(lang);
-  const [localModelConfig, setLocalModelConfig] = useState<ModelConfig>(modelConfig);
   const [showAiSettings, setShowAiSettings] = useState(false);
-  const currentProviderDefaults = PROVIDER_DEFAULTS[localModelConfig.provider];
   const timezoneOptions = useMemo(() => getTimezoneOptions(timezone), [timezone]);
-
-  const handleSaveModelConfig = () => {
-    setModelConfig(localModelConfig);
-    toast.success(t.modelConfigSaved);
-    setShowAiSettings(false);
-  };
-
-  const handleProviderChange = (provider: ModelProvider) => {
-    setLocalModelConfig((prev) => {
-      const defaults = PROVIDER_DEFAULTS[provider];
-      const shouldReplaceModel = !prev.modelName || KNOWN_DEFAULT_MODELS.has(prev.modelName);
-      const shouldReplaceApiBase = !prev.apiBase || KNOWN_DEFAULT_BASES.has(prev.apiBase);
-
-      return {
-        ...prev,
-        provider,
-        modelName: shouldReplaceModel ? defaults.modelName : prev.modelName,
-        apiBase: shouldReplaceApiBase ? defaults.apiBase : prev.apiBase,
-      };
-    });
-  };
 
   if (!isOpen) return null;
 
@@ -227,10 +170,7 @@ export function SettingsModal({
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl overflow-hidden shadow-sm dark:shadow-none text-[15px]">
               
               {!showAiSettings ? (
-                <button onClick={() => {
-                  setLocalModelConfig(modelConfig);
-                  setShowAiSettings(true);
-                }} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                <button onClick={() => setShowAiSettings(true)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center text-white"><Brain size={18} /></div>
                     <span className="font-medium text-black dark:text-white">{t.aiModelSettings}</span>
@@ -239,70 +179,15 @@ export function SettingsModal({
                 </button>
               ) : (
                 <div className="p-4 space-y-4">
-                  {/* Provider Select */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.modelProvider}</label>
-                    <select
-                      value={localModelConfig.provider}
-                      onChange={(e) => handleProviderChange(e.target.value as ModelProvider)}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    >
-                      <option value="google">{t.google}</option>
-                      <option value="volcengine">{t.volcengine}</option>
-                      <option value="openai">{t.openai}</option>
-                      <option value="anthropic">{t.anthropic}</option>
-                    </select>
-                  </div>
-
-                  {/* API Key */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.apiKey}</label>
-                    <input
-                      type="password"
-                      value={localModelConfig.apiKey}
-                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, apiKey: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder={currentProviderDefaults.apiKeyPlaceholder}
-                    />
-                  </div>
-
-                  {/* Model Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.modelName}</label>
-                    <input
-                      type="text"
-                      value={localModelConfig.modelName}
-                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, modelName: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder={currentProviderDefaults.modelPlaceholder}
-                    />
-                  </div>
-
-                  {/* API Base */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.apiBase}</label>
-                    <input
-                      type="text"
-                      value={localModelConfig.apiBase || ''}
-                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, apiBase: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder={currentProviderDefaults.apiBasePlaceholder}
-                    />
-                  </div>
-
-                  {/* Buttons */}
+                  <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                    {t.aiServiceDescription}
+                  </p>
                   <div className="flex gap-3 pt-2">
                     <button
                       onClick={() => setShowAiSettings(false)}
-                      className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                     >
-                      {t.cancel}
-                    </button>
-                    <button
-                      onClick={handleSaveModelConfig}
-                      className="flex-1 px-4 py-2 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition-colors"
-                    >
-                      {t.saveModelConfig}
+                      {t.close}
                     </button>
                   </div>
                 </div>

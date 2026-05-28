@@ -1,20 +1,26 @@
 {
-  "name": "react-example",
+  "name": "mianleme",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "build:capacitor": "vite build --mode capacitor",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "cap:add:ios": "npx cap add ios",
+    "cap:sync": "npm run build:capacitor && npx cap sync ios",
+    "cap:open": "npx cap open ios"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.31.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
-    "@anthropic-ai/sdk": "^0.31.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.3.0",
     "dotenv": "^17.2.3",
@@ -31,6 +37,7 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react-datepicker": "^6.2.0",

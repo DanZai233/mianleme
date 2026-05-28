@@ -10,7 +10,7 @@ import { Toaster, toast } from 'react-hot-toast';
 import { format, isSameDay, addDays, subDays, eachDayOfInterval, isToday } from 'date-fns';
 
 export default function App() {
-  const { state, addInterview, updateInterview, deleteInterview, setLanguage, setTimezone, importData, setDarkMode, setNotificationsEnabled, setModelConfig } = useAppState();
+  const { state, addInterview, updateInterview, deleteInterview, setLanguage, setTimezone, importData, setDarkMode, setNotificationsEnabled } = useAppState();
   const t = useI18n(state.language);
   
   const [search, setSearch] = useState('');
@@ -367,7 +367,6 @@ export default function App() {
           initialData={editingData} 
           lang={state.language} 
           existingInterviews={state.interviews}
-          modelConfig={state.modelConfig}
           timezone={state.timezone}
           onClose={() => setIsModalOpen(false)} 
           onSave={(data) => {
@@ -397,8 +396,6 @@ export default function App() {
         requestNotifications={requestNotifications}
         onExport={handleExport}
         onImport={handleImport}
-        modelConfig={state.modelConfig}
-        setModelConfig={setModelConfig}
       />
 
     </div>
