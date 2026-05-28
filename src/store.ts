@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { AppState, Interview, Language } from "./types";
+import { AppState, FollowUpTemplates, Interview, InterviewPrepPack, InterviewStage, Language, PrepChecklistItem } from "./types";
 import { getBrowserTimezone } from "./utils";
+import { INTERVIEW_STAGE_VALUES } from "./interviewDefaults";
 
 const STORAGE_KEY = "interview_tracker_data";
 const INTERVIEW_RESULTS = new Set(["unknown", "waiting", "offer", "rejected", "withdrawn"]);
+const INTERVIEW_STAGES = new Set<InterviewStage>(INTERVIEW_STAGE_VALUES);
 
 const defaultState: AppState = {
   interviews: [],
@@ -15,6 +17,7 @@ const defaultState: AppState = {
 
 function normalizeInterview(interview: Partial<Interview>): Interview {
   const result = typeof interview.result === "string" && INTERVIEW_RESULTS.has(interview.result) ? interview.result : "unknown";
+  const stage = typeof interview.stage === "string" && INTERVIEW_STAGES.has(interview.stage as InterviewStage) ? interview.stage as InterviewStage : "applied";
 
   return {
     id: String(interview.id || `${Date.now()}-${Math.random()}`),
@@ -27,11 +30,55 @@ function normalizeInterview(interview: Partial<Interview>): Interview {
     notes: String(interview.notes || ""),
     review: String(interview.review || ""),
     result: result as Interview["result"],
+    stage,
+    prepChecklist: normalizePrepChecklist(interview.prepChecklist),
+    prepPack: normalizePrepPack(interview.prepPack),
+    followUpTemplates: normalizeFollowUpTemplates(interview.followUpTemplates),
     followUpDate: String(interview.followUpDate || ""),
     followUpDone: Boolean(interview.followUpDone),
     status: interview.status || "upcoming",
     reminderHours: Number.isFinite(Number(interview.reminderHours)) ? Number(interview.reminderHours) : 1,
     durationMinutes: Number.isFinite(Number(interview.durationMinutes)) ? Number(interview.durationMinutes) : 60,
+  };
+}
+
+function normalizePrepChecklist(value: unknown): PrepChecklistItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item: any, index) => ({
+      id: String(item?.id || `prep-${index}`),
+      text: String(item?.text || "").trim(),
+      done: Boolean(item?.done),
+    }))
+    .filter((item) => item.text);
+}
+
+function normalizeTextList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 8);
+}
+
+function normalizePrepPack(value: unknown): InterviewPrepPack | null {
+  if (!value || typeof value !== "object") return null;
+  const pack = value as Partial<InterviewPrepPack>;
+  return {
+    generatedAt: String(pack.generatedAt || new Date().toISOString()),
+    possibleQuestions: normalizeTextList(pack.possibleQuestions),
+    starStories: normalizeTextList(pack.starStories),
+    questionsToAsk: normalizeTextList(pack.questionsToAsk),
+    quickBrief: normalizeTextList(pack.quickBrief),
+  };
+}
+
+function normalizeFollowUpTemplates(value: unknown): FollowUpTemplates | null {
+  if (!value || typeof value !== "object") return null;
+  const templates = value as Partial<FollowUpTemplates>;
+  return {
+    generatedAt: String(templates.generatedAt || new Date().toISOString()),
+    thankYou: String(templates.thankYou || ""),
+    progressCheck: String(templates.progressCheck || ""),
+    addendum: String(templates.addendum || ""),
+    englishFollowUp: String(templates.englishFollowUp || ""),
   };
 }
 

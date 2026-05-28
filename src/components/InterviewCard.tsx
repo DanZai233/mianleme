@@ -1,24 +1,31 @@
 import React, { useState } from 'react';
-import { Interview, InterviewResult, Language } from '../types';
+import { Interview, InterviewResult, InterviewStage, Language } from '../types';
 import { useI18n } from '../i18n';
 import { addToSystemCalendar, createGoogleCalendarUrl } from '../utils';
 import {
+  Brain,
   Calendar,
   CalendarPlus,
   CheckCircle2,
+  ClipboardCheck,
   Clock,
   Copy,
   Edit2,
   ExternalLink,
   Hash,
   Link as LinkIcon,
+  Mail,
   MapPin,
+  RefreshCw,
   Share,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { apiUrl } from '../api';
+import { createPrepChecklist } from '../interviewDefaults';
 
 interface Props {
   interview: Interview;
@@ -62,6 +69,15 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
     rejected: t.resultRejected,
     withdrawn: t.resultWithdrawn,
   };
+  const stageLabels: Record<InterviewStage, string> = {
+    applied: t.stageApplied,
+    hr: t.stageHr,
+    technical1: t.stageTechnical1,
+    technical2: t.stageTechnical2,
+    final: t.stageFinal,
+    offerTalk: t.stageOfferTalk,
+    closed: t.stageClosed,
+  };
 
   const d = new Date(interview.date);
   const hasValidDate = !isNaN(d.getTime());
@@ -71,6 +87,8 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
   const followUpTime = new Date(interview.followUpDate);
   const hasFollowUp = interview.status === 'completed' && interview.followUpDate && !isNaN(followUpTime.getTime());
   const isFollowUpDue = Boolean(hasFollowUp && !interview.followUpDone && followUpTime.getTime() <= Date.now());
+  const prepTotal = interview.prepChecklist?.length || 0;
+  const prepDone = interview.prepChecklist?.filter(item => item.done).length || 0;
   const description = [
     interview.notes,
     interview.review ? `${t.postInterviewReview}: ${interview.review}` : '',
@@ -196,6 +214,9 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
             </p>
 
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-3">
+              <span className="flex items-center gap-1 min-w-0">
+                <ClipboardCheck size={12} className="shrink-0"/> {stageLabels[interview.stage]}
+              </span>
               {interview.platform && (
                 <span className="flex items-center gap-1 min-w-0">
                   <MapPin size={12} className="shrink-0"/> {interview.platform}
@@ -208,6 +229,9 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
               )}
               {interview.reminderHours > 0 && (
                 <span className="flex items-center gap-1"><Clock size={12}/> {interview.reminderHours}h {lang === 'zh' ? '前提醒' : 'before'}</span>
+              )}
+              {interview.status === 'upcoming' && prepTotal > 0 && (
+                <span className="flex items-center gap-1"><Brain size={12}/> {t.prepProgress} {prepDone}/{prepTotal}</span>
               )}
             </div>
 
@@ -307,6 +331,7 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
         <InterviewDetailsModal
           interview={interview}
           lang={lang}
+          timezone={timezone}
           fullDate={fullDate}
           calendarOptions={{
             onGoogleCalendar: handleGoogleCalendar,
@@ -329,6 +354,7 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
 interface DetailsProps {
   interview: Interview;
   lang: Language;
+  timezone: string;
   fullDate: string;
   calendarOptions: {
     onGoogleCalendar: (event?: React.MouseEvent) => void;
@@ -341,8 +367,10 @@ interface DetailsProps {
   onShare: (event?: React.MouseEvent) => void;
 }
 
-function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onUpdate, onClose, onCopyMeetingId, onEdit, onShare }: DetailsProps) {
+function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOptions, onUpdate, onClose, onCopyMeetingId, onEdit, onShare }: DetailsProps) {
   const t = useI18n(lang);
+  const [isGeneratingPrep, setIsGeneratingPrep] = useState(false);
+  const [isGeneratingTemplates, setIsGeneratingTemplates] = useState(false);
   const resultLabels: Record<InterviewResult, string> = {
     unknown: t.resultUnknown,
     waiting: t.resultWaiting,
@@ -350,8 +378,73 @@ function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onU
     rejected: t.resultRejected,
     withdrawn: t.resultWithdrawn,
   };
+  const stageLabels: Record<InterviewStage, string> = {
+    applied: t.stageApplied,
+    hr: t.stageHr,
+    technical1: t.stageTechnical1,
+    technical2: t.stageTechnical2,
+    final: t.stageFinal,
+    offerTalk: t.stageOfferTalk,
+    closed: t.stageClosed,
+  };
   const followUpTime = new Date(interview.followUpDate);
   const hasFollowUp = interview.status === 'completed' && interview.followUpDate && !isNaN(followUpTime.getTime());
+  const prepChecklist = interview.prepChecklist || [];
+  const prepDone = prepChecklist.filter(item => item.done).length;
+
+  const togglePrepItem = (id: string) => {
+    onUpdate({
+      prepChecklist: prepChecklist.map(item => item.id === id ? { ...item, done: !item.done } : item),
+    });
+  };
+
+  const addDefaultPrep = () => {
+    onUpdate({ prepChecklist: createPrepChecklist(lang) });
+  };
+
+  const generatePrepPack = async () => {
+    setIsGeneratingPrep(true);
+    try {
+      const response = await fetch(apiUrl('/api/generate-prep-pack'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interview, lang, timezone }),
+      });
+      if (!response.ok) throw new Error('Failed to generate prep pack');
+      const prepPack = await response.json();
+      onUpdate({ prepPack });
+      toast.success(t.aiPrepPack);
+    } catch (error: any) {
+      toast.error(error?.message || t.calendarUnavailable);
+    } finally {
+      setIsGeneratingPrep(false);
+    }
+  };
+
+  const generateFollowUpTemplates = async () => {
+    setIsGeneratingTemplates(true);
+    try {
+      const response = await fetch(apiUrl('/api/generate-followup-message'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interview, lang }),
+      });
+      if (!response.ok) throw new Error('Failed to generate templates');
+      const followUpTemplates = await response.json();
+      onUpdate({ followUpTemplates });
+      toast.success(t.followUpTemplates);
+    } catch (error: any) {
+      toast.error(error?.message || t.calendarUnavailable);
+    } finally {
+      setIsGeneratingTemplates(false);
+    }
+  };
+
+  const copyTemplate = async (text: string) => {
+    if (!text) return;
+    await copyToClipboard(text);
+    toast.success(t.templateCopied);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
@@ -375,6 +468,7 @@ function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onU
 
         <div className="p-5 space-y-4">
           <DetailRow icon={<Clock size={17} />} label={t.dateTime} value={fullDate} />
+          <DetailRow icon={<ClipboardCheck size={17} />} label={t.stage} value={stageLabels[interview.stage]} />
           <DetailRow icon={<Calendar size={17} />} label={t.duration} value={`${interview.durationMinutes || 60} ${lang === 'zh' ? '分钟' : 'min'}`} />
           {interview.platform && <DetailRow icon={<MapPin size={17} />} label={t.platform} value={interview.platform} />}
 
@@ -409,6 +503,61 @@ function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onU
             </div>
           )}
 
+          <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-indigo-700 dark:text-indigo-300">{t.prepChecklist}</p>
+                <p className="text-sm font-bold text-black dark:text-white">{prepDone}/{prepChecklist.length || 0}</p>
+              </div>
+              {prepChecklist.length === 0 && (
+                <button onClick={addDefaultPrep} className="min-h-9 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-bold text-white">
+                  {t.addDefaultPrep}
+                </button>
+              )}
+            </div>
+            {prepChecklist.length > 0 && (
+              <div className="space-y-2">
+                {prepChecklist.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => togglePrepItem(item.id)}
+                    className="w-full rounded-xl bg-white/80 dark:bg-black/20 p-3 text-left flex items-start gap-3 active:scale-[0.99] transition-transform"
+                  >
+                    <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${item.done ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-gray-300 dark:border-white/20'}`}>
+                      {item.done && <CheckCircle2 size={14} />}
+                    </span>
+                    <span className={`text-sm leading-relaxed ${item.done ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-200'}`}>{item.text}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl bg-violet-50 dark:bg-violet-500/10 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase text-violet-700 dark:text-violet-300">{t.aiPrepPack}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{interview.prepPack ? format(new Date(interview.prepPack.generatedAt), 'yyyy-MM-dd HH:mm') : t.generatePrepPack}</p>
+              </div>
+              <button
+                onClick={generatePrepPack}
+                disabled={isGeneratingPrep}
+                className="min-h-9 shrink-0 rounded-xl bg-violet-500 disabled:bg-violet-300 px-3 py-2 text-xs font-bold text-white flex items-center gap-1.5"
+              >
+                {isGeneratingPrep ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {isGeneratingPrep ? t.generating : interview.prepPack ? t.regeneratePrepPack : t.generatePrepPack}
+              </button>
+            </div>
+            {interview.prepPack && (
+              <div className="space-y-3">
+                <PrepPackSection title={t.quickBrief} items={interview.prepPack.quickBrief} />
+                <PrepPackSection title={t.possibleQuestions} items={interview.prepPack.possibleQuestions} />
+                <PrepPackSection title={t.starStories} items={interview.prepPack.starStories} />
+                <PrepPackSection title={t.questionsToAsk} items={interview.prepPack.questionsToAsk} />
+              </div>
+            )}
+          </div>
+
           {interview.status !== 'upcoming' && (
             <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 p-4">
               <p className="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300 mb-2">{t.result}</p>
@@ -437,6 +586,31 @@ function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onU
             </div>
           )}
 
+          <div className="rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase text-cyan-700 dark:text-cyan-300">{t.followUpTemplates}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{interview.followUpTemplates ? format(new Date(interview.followUpTemplates.generatedAt), 'yyyy-MM-dd HH:mm') : t.generateFollowUpTemplates}</p>
+              </div>
+              <button
+                onClick={generateFollowUpTemplates}
+                disabled={isGeneratingTemplates}
+                className="min-h-9 shrink-0 rounded-xl bg-cyan-500 disabled:bg-cyan-300 px-3 py-2 text-xs font-bold text-white flex items-center gap-1.5"
+              >
+                {isGeneratingTemplates ? <RefreshCw size={14} className="animate-spin" /> : <Mail size={14} />}
+                {isGeneratingTemplates ? t.generating : t.generateFollowUpTemplates}
+              </button>
+            </div>
+            {interview.followUpTemplates && (
+              <div className="space-y-2">
+                <TemplateBlock title={t.thankYouTemplate} text={interview.followUpTemplates.thankYou} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
+                <TemplateBlock title={t.progressCheckTemplate} text={interview.followUpTemplates.progressCheck} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
+                <TemplateBlock title={t.addendumTemplate} text={interview.followUpTemplates.addendum} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
+                <TemplateBlock title={t.englishFollowUpTemplate} text={interview.followUpTemplates.englishFollowUp} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-2 pt-1">
             <button onClick={calendarOptions.onGoogleCalendar} className="min-h-11 rounded-xl bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-[13px] font-semibold text-blue-600 dark:text-blue-300 flex items-center justify-center gap-1.5">
               <ExternalLink size={15} /> {t.googleCalendar}
@@ -456,6 +630,37 @@ function InterviewDetailsModal({ interview, lang, fullDate, calendarOptions, onU
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function PrepPackSection({ title, items }: { title: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="rounded-xl bg-white/80 dark:bg-black/20 p-3">
+      <p className="mb-2 text-[11px] font-bold uppercase text-gray-500">{title}</p>
+      <ul className="space-y-1.5">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="text-sm leading-relaxed text-gray-700 dark:text-gray-200">
+            {index + 1}. {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TemplateBlock({ title, text, onCopy, copyLabel }: { title: string; text: string; onCopy: (text: string) => void; copyLabel: string }) {
+  if (!text) return null;
+  return (
+    <div className="rounded-xl bg-white/80 dark:bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-[11px] font-bold uppercase text-gray-500">{title}</p>
+        <button onClick={() => onCopy(text)} className="rounded-lg bg-cyan-500 px-2.5 py-1.5 text-[11px] font-bold text-white">
+          {copyLabel}
+        </button>
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-200">{text}</p>
     </div>
   );
 }

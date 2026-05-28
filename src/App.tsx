@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppState } from './store';
 import { useI18n } from './i18n';
-import { Interview, InterviewResult, Language } from './types';
+import { Interview, InterviewResult, InterviewStage, Language } from './types';
 import { InterviewCard } from './components/InterviewCard';
 import { AddInterviewModal } from './components/AddInterviewModal';
 import { SettingsModal } from './components/SettingsModal';
@@ -9,6 +9,14 @@ import { Bell, CheckCircle2, MessageSquare, Plus, Search, Settings, Calendar as 
 import { Toaster, toast } from 'react-hot-toast';
 import { format, isSameDay, addDays, subDays, eachDayOfInterval, isToday } from 'date-fns';
 import { formatDateTimeForTimezone } from './utils';
+import {
+  clearPendingNativeShare,
+  getPendingNativeShare,
+  isNativeApp,
+  requestNativeReminderPermission,
+  syncNativeInterviewReminders,
+  syncWidgetSnapshot,
+} from './nativeIntegrations';
 
 const NOTIFICATION_SENT_KEY = 'interview_tracker_notifications_sent';
 
@@ -42,6 +50,8 @@ export default function App() {
   
   const [editingData, setEditingData] = useState<Interview | null>(null);
   const [completingData, setCompletingData] = useState<Interview | null>(null);
+  const [pendingShare, setPendingShare] = useState<{ text?: string; imageBase64?: string } | null>(null);
+  const [checkedNativeShare, setCheckedNativeShare] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const resultLabels: Record<InterviewResult, string> = {
@@ -50,6 +60,15 @@ export default function App() {
     offer: t.resultOffer,
     rejected: t.resultRejected,
     withdrawn: t.resultWithdrawn,
+  };
+  const stageLabels: Record<InterviewStage, string> = {
+    applied: t.stageApplied,
+    hr: t.stageHr,
+    technical1: t.stageTechnical1,
+    technical2: t.stageTechnical2,
+    final: t.stageFinal,
+    offerTalk: t.stageOfferTalk,
+    closed: t.stageClosed,
   };
 
   useEffect(() => {
@@ -65,6 +84,40 @@ export default function App() {
       setNotificationsEnabled(true);
     }
   }, [setNotificationsEnabled]);
+
+  useEffect(() => {
+    const checkPendingShare = () => {
+      getPendingNativeShare().then((share) => {
+        if (!share.text && !share.imageBase64) return;
+        setPendingShare(share);
+        setEditingData(null);
+        setIsModalOpen(true);
+        toast.success(t.shareImportReady);
+      }).catch(() => {});
+    };
+
+    if (!checkedNativeShare) {
+      setCheckedNativeShare(true);
+      checkPendingShare();
+    }
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') checkPendingShare();
+    };
+    window.addEventListener('focus', checkPendingShare);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', checkPendingShare);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [checkedNativeShare, t.shareImportReady]);
+
+  useEffect(() => {
+    syncWidgetSnapshot(state.interviews, state.timezone, state.language).catch(() => {});
+    if (state.notificationsEnabled) {
+      syncNativeInterviewReminders(state.interviews, state.language, state.timezone).catch(() => {});
+    }
+  }, [state.interviews, state.timezone, state.language, state.notificationsEnabled]);
 
   useEffect(() => {
     if (!state.notificationsEnabled) return;
@@ -109,7 +162,23 @@ export default function App() {
     return () => clearInterval(interval);
   }, [state.interviews, state.notificationsEnabled, t]);
 
-  const requestNotifications = () => {
+  const requestNotifications = async () => {
+    if (isNativeApp()) {
+      try {
+        const granted = await requestNativeReminderPermission();
+        if (granted) {
+          setNotificationsEnabled(true);
+          await syncNativeInterviewReminders(state.interviews, state.language, state.timezone);
+          toast.success(t.nativeNotificationsEnabled);
+        } else {
+          toast.error(t.calendarPermissionDenied);
+        }
+      } catch {
+        toast.error(t.calendarUnavailable);
+      }
+      return;
+    }
+
     if ("Notification" in window) {
       Notification.requestPermission().then(permission => {
         if (permission === "granted") {
@@ -263,6 +332,24 @@ export default function App() {
       if (!isNaN(time)) months.add(format(new Date(time), 'yyyy-MM'));
     });
     return Array.from(months).sort().reverse();
+  }, [state.interviews]);
+
+  const companyTimelines = useMemo(() => {
+    const groups = new Map<string, Interview[]>();
+    state.interviews.forEach((interview) => {
+      const company = interview.company.trim();
+      if (!company) return;
+      groups.set(company, [...(groups.get(company) || []), interview]);
+    });
+
+    return Array.from(groups.entries())
+      .map(([company, interviews]) => ({
+        company,
+        interviews: interviews.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+        latestTime: Math.max(...interviews.map((interview) => new Date(interview.date).getTime()).filter(Number.isFinite)),
+      }))
+      .sort((a, b) => b.latestTime - a.latestTime)
+      .slice(0, 4);
   }, [state.interviews]);
 
   return (
@@ -452,6 +539,32 @@ export default function App() {
               ))}
             </select>
           </div>
+          {companyTimelines.length > 0 && (
+            <div className="mb-6 space-y-3">
+              <h3 className="px-1 text-xs font-bold uppercase text-gray-500">{t.companyTimeline}</h3>
+              {companyTimelines.map((group) => (
+                <div key={group.company} className="ios-card p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-sm font-bold text-black dark:text-white">{group.company}</p>
+                    <span className="shrink-0 text-[11px] font-bold text-gray-400">{group.interviews.length} {t.interviewsCount}</span>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+                    {group.interviews.map((interview) => (
+                      <button
+                        key={interview.id}
+                        onClick={() => { setEditingData(interview); setIsModalOpen(true); }}
+                        className="min-w-[132px] rounded-2xl bg-[#F2F2F7] dark:bg-black/40 p-3 text-left active:scale-[0.99] transition-transform"
+                      >
+                        <p className="text-[11px] font-bold text-blue-600 dark:text-blue-300">{stageLabels[interview.stage]}</p>
+                        <p className="mt-1 truncate text-xs font-semibold text-black dark:text-white">{interview.role}</p>
+                        <p className="mt-1 text-[11px] text-gray-500">{interview.date ? format(new Date(interview.date), 'MM-dd HH:mm') : '-'}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           </>
         )}
 
@@ -489,7 +602,7 @@ export default function App() {
 
       {/* Floating Add Button (Apple style blue circle) */}
       <button
-        onClick={() => { setEditingData(null); setIsModalOpen(true); }}
+        onClick={() => { setEditingData(null); setPendingShare(null); setIsModalOpen(true); }}
         className="fixed bottom-8 right-6 lg:right-auto lg:left-1/2 lg:translate-x-[220px] w-[60px] h-[60px] bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 z-30 shadow-[0_8px_30px_rgb(59,130,246,0.3)]"
       >
         <Plus size={28} strokeWidth={2.5} />
@@ -501,14 +614,26 @@ export default function App() {
           lang={state.language} 
           existingInterviews={state.interviews}
           timezone={state.timezone}
-          onClose={() => setIsModalOpen(false)} 
-          onSave={(data) => {
+          initialExtractText={pendingShare?.text || ''}
+          initialImageBase64={pendingShare?.imageBase64 || ''}
+          onClose={() => {
+            if (pendingShare) {
+              clearPendingNativeShare().catch(() => {});
+              setPendingShare(null);
+            }
+            setIsModalOpen(false);
+          }}
+          onSave={async (data) => {
             if (editingData) {
               updateInterview(data.id, data);
               toast.success(t.extractedSuccess); // Reuse success message
             } else {
               addInterview(data);
-              toast.success(t.extractedSuccess);
+              toast.success(pendingShare ? t.shareImportUsed : t.extractedSuccess);
+            }
+            if (pendingShare) {
+              await clearPendingNativeShare().catch(() => {});
+              setPendingShare(null);
             }
             setIsModalOpen(false);
           }} 

@@ -5,6 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { calendarEventFromQuery, createICS, sanitizeCalendarFileName } from "./src/calendar";
+import { normalizeFollowUpTemplates, normalizePrepPack } from "./src/aiExtras";
 import { normalizeParsedInterviewResult } from "./src/parseResult";
 
 type AiProvider = "google" | "volcengine" | "openai" | "anthropic";
@@ -297,6 +298,99 @@ Output JSON format strictly:
       }
       const message = error?.message || "智能识别服务暂时不可用，请稍后重试";
       res.status(500).json({ error: message });
+    }
+  });
+
+  app.post("/api/generate-prep-pack", async (req, res) => {
+    try {
+      const interview = req.body?.interview || {};
+      const lang = req.body?.lang === "en" ? "en" : "zh";
+      const timezone = normalizeTimezone(req.body?.timezone);
+      const prompt = lang === "zh"
+        ? `你是一个严谨的求职面试教练。请根据面试信息生成移动端可直接阅读的准备包，只返回 JSON。
+
+要求：
+- possibleQuestions: 5-8 个最可能被问到的问题，贴合公司、岗位、备注和会议信息。
+- starStories: 3-5 个 STAR 回答准备点，每条包含场景、行动、结果方向。
+- questionsToAsk: 3-5 个适合反问面试官的问题。
+- quickBrief: 4-6 条面试前 5 分钟速览要点。
+- 不要编造公司不存在的事实；缺信息时用通用但有帮助的建议。
+
+输出格式：
+{
+  "possibleQuestions": [],
+  "starStories": [],
+  "questionsToAsk": [],
+  "quickBrief": []
+}`
+        : `You are a concise interview coach. Generate a mobile-friendly prep pack from the interview data and return JSON only.
+
+Requirements:
+- possibleQuestions: 5-8 likely questions tailored to company, role, notes, and meeting context.
+- starStories: 3-5 STAR story prompts with situation/action/result direction.
+- questionsToAsk: 3-5 good questions for the interviewer.
+- quickBrief: 4-6 five-minute pre-interview reminders.
+- Do not invent company-specific facts; use useful generic advice when information is missing.
+
+Output:
+{
+  "possibleQuestions": [],
+  "starStories": [],
+  "questionsToAsk": [],
+  "quickBrief": []
+}`;
+
+      const data = await callModel(prompt, JSON.stringify({ timezone, interview }, null, 2));
+      res.json(normalizePrepPack(data));
+    } catch (error: any) {
+      console.error("Prep Pack Error:", error);
+      res.status(500).json({ error: error?.message || "生成准备包失败" });
+    }
+  });
+
+  app.post("/api/generate-followup-message", async (req, res) => {
+    try {
+      const interview = req.body?.interview || {};
+      const lang = req.body?.lang === "en" ? "en" : "zh";
+      const prompt = lang === "zh"
+        ? `你是一个专业、自然、不油腻的求职沟通助手。根据面试信息、结果和面后评论，生成可复制的跟进模板，只返回 JSON。
+
+要求：
+- thankYou: 面试后 24 小时内发送的感谢消息，简洁真诚。
+- progressCheck: 过了跟进时间后询问进度的消息，礼貌不催促。
+- addendum: 用于补充材料或补充回答的消息。
+- englishFollowUp: 英文跟进消息，语气专业。
+- 不要出现占位符，信息不足时写得通用一些。
+
+输出格式：
+{
+  "thankYou": "",
+  "progressCheck": "",
+  "addendum": "",
+  "englishFollowUp": ""
+}`
+        : `You are a professional job-search communication assistant. Generate copy-ready follow-up templates from the interview data, result, and review. Return JSON only.
+
+Requirements:
+- thankYou: a concise thank-you note within 24 hours after the interview.
+- progressCheck: a polite status check after the follow-up date.
+- addendum: a note for sharing additional material or clarifying an answer.
+- englishFollowUp: a polished English follow-up note.
+- Do not use placeholders; keep it useful when details are missing.
+
+Output:
+{
+  "thankYou": "",
+  "progressCheck": "",
+  "addendum": "",
+  "englishFollowUp": ""
+}`;
+
+      const data = await callModel(prompt, JSON.stringify({ interview }, null, 2));
+      res.json(normalizeFollowUpTemplates(data));
+    } catch (error: any) {
+      console.error("Follow-up Template Error:", error);
+      res.status(500).json({ error: error?.message || "生成跟进模板失败" });
     }
   });
 

@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Interview, InterviewResult, Language } from '../types';
+import { Interview, InterviewResult, InterviewStage, Language } from '../types';
 import { useI18n } from '../i18n';
 import { v4 as uuidv4 } from 'uuid';
 import { X, Sparkles, Image as ImageIcon, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateTimeForTimezone, normalizeExtractedDate } from '../utils';
 import { apiUrl } from '../api';
+import { createPrepChecklist, INTERVIEW_STAGE_VALUES } from '../interviewDefaults';
 
 interface Props {
   initialData?: Interview | null;
@@ -14,9 +15,11 @@ interface Props {
   onSave: (i: Interview) => void;
   existingInterviews: Interview[];
   timezone: string;
+  initialExtractText?: string;
+  initialImageBase64?: string;
 }
 
-export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, timezone }: Props) {
+export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, timezone, initialExtractText = '', initialImageBase64 = '' }: Props) {
   const t = useI18n(lang);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultLabels: Record<InterviewResult, string> = {
@@ -25,6 +28,15 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
     offer: t.resultOffer,
     rejected: t.resultRejected,
     withdrawn: t.resultWithdrawn,
+  };
+  const stageLabels: Record<InterviewStage, string> = {
+    applied: t.stageApplied,
+    hr: t.stageHr,
+    technical1: t.stageTechnical1,
+    technical2: t.stageTechnical2,
+    final: t.stageFinal,
+    offerTalk: t.stageOfferTalk,
+    closed: t.stageClosed,
   };
   
   const [formData, setFormData] = useState<Interview>(
@@ -39,6 +51,10 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       notes: '',
       review: '',
       result: 'unknown',
+      stage: 'applied',
+      prepChecklist: createPrepChecklist(lang),
+      prepPack: null,
+      followUpTemplates: null,
       followUpDate: '',
       followUpDone: false,
       status: 'upcoming',
@@ -48,8 +64,9 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
   );
   
   const [extractMode, setExtractMode] = useState(false);
-  const [extractText, setExtractText] = useState('');
+  const [extractText, setExtractText] = useState(initialExtractText);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [shareExtractStarted, setShareExtractStarted] = useState(false);
 
   // Focus lock effect avoiding background jumps
   useEffect(() => {
@@ -116,6 +133,14 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       setIsExtracting(false);
     }
   };
+
+  useEffect(() => {
+    if (initialData || shareExtractStarted || (!initialExtractText && !initialImageBase64)) return;
+    setShareExtractStarted(true);
+    setExtractMode(true);
+    if (initialExtractText) setExtractText(initialExtractText);
+    handleExtract(initialExtractText, initialImageBase64);
+  }, [initialData, initialExtractText, initialImageBase64, shareExtractStarted]);
 
   const onImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -221,6 +246,19 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
                  <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.duration}</label>
                  <input type="number" min="1" value={formData.durationMinutes} onChange={e => setFormData({...formData, durationMinutes: Number(e.target.value)})} className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none" />
               </div>
+            </div>
+
+            <div className="relative">
+              <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.stage}</label>
+              <select
+                value={formData.stage}
+                onChange={e => setFormData({...formData, stage: e.target.value as InterviewStage})}
+                className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none appearance-none"
+              >
+                {INTERVIEW_STAGE_VALUES.map((stage) => (
+                  <option key={stage} value={stage}>{stageLabels[stage]}</option>
+                ))}
+              </select>
             </div>
 
             {hasConflict() && (

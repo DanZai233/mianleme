@@ -1,5 +1,28 @@
 export type InterviewStatus = "upcoming" | "completed" | "archived";
 export type InterviewResult = "unknown" | "waiting" | "offer" | "rejected" | "withdrawn";
+export type InterviewStage = "applied" | "hr" | "technical1" | "technical2" | "final" | "offerTalk" | "closed";
+
+export interface PrepChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface InterviewPrepPack {
+  generatedAt: string;
+  possibleQuestions: string[];
+  starStories: string[];
+  questionsToAsk: string[];
+  quickBrief: string[];
+}
+
+export interface FollowUpTemplates {
+  generatedAt: string;
+  thankYou: string;
+  progressCheck: string;
+  addendum: string;
+  englishFollowUp: string;
+}
 
 export interface Interview {
   id: string;
@@ -12,6 +35,10 @@ export interface Interview {
   notes: string;
   review: string;
   result: InterviewResult;
+  stage: InterviewStage;
+  prepChecklist: PrepChecklistItem[];
+  prepPack: InterviewPrepPack | null;
+  followUpTemplates: FollowUpTemplates | null;
   followUpDate: string;
   followUpDone: boolean;
   status: InterviewStatus;
