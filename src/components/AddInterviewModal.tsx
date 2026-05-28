@@ -21,13 +21,14 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<Interview>(
-    initialData || {
+    initialData ? { ...initialData, meetingId: initialData.meetingId || '' } : {
       id: uuidv4(),
       company: '',
       role: '',
       date: formatDateTimeForTimezone(new Date(), timezone),
       platform: '',
       link: '',
+      meetingId: '',
       notes: '',
       status: 'upcoming',
       reminderHours: 1,
@@ -88,6 +89,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
         date: normalizeExtractedDate(data.date, timezone) || prev.date,
         platform: data.platform || prev.platform,
         link: data.link || prev.link,
+        meetingId: data.meetingId || prev.meetingId,
         notes: data.notes || prev.notes,
         durationMinutes: data.durationMinutes || prev.durationMinutes,
       }));
@@ -229,6 +231,11 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
             <div className="relative">
               <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.link}</label>
               <input type="text" value={formData.link} onChange={e => setFormData({...formData, link: e.target.value})} className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none" />
+            </div>
+
+            <div className="relative">
+              <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.meetingId}</label>
+              <input type="text" value={formData.meetingId} onChange={e => setFormData({...formData, meetingId: e.target.value})} className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none" />
             </div>
 
             <div className="relative">

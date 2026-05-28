@@ -2,6 +2,8 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { calendarEventFromQuery, createICS, sanitizeCalendarFileName } from "../src/calendar";
+import { normalizeParsedInterviewResult } from "../src/parseResult";
 
 const app = express();
 
@@ -272,8 +274,9 @@ Extract the following information and return ONLY a valid JSON object:
 - role: string (job title/position)
 - date: string (local datetime in the user's timezone, format "YYYY-MM-DDTHH:mm", no seconds, no timezone suffix. If no year is specified, assume ${timezoneToday.year}. If the source explicitly mentions another timezone, convert it to ${timezone}. If no timezone is mentioned, assume ${timezone})
 - platform: string (e.g., Zoom, Teams, Google Meet, Tencent Meeting, Phone, On-site, etc.)
-- link: string (the meeting link, URL, meeting ID, or meeting number. If no URL is available but a meeting ID is, put it here)
-- notes: string (any passcodes, passwords, or additional instructions. Separate points with newlines)
+- link: string (meeting URL only. If no URL is available, leave it empty; do not put meeting IDs here)
+- meetingId: string (conference or meeting number only, such as Zoom Meeting ID or Tencent Meeting number. Preserve useful spaces or dashes. Do not include passcodes/passwords)
+- notes: string (any passcodes, passwords, dial-in details, or additional instructions. Separate points with newlines)
 - durationMinutes: number (estimated duration of the interview in minutes. If not specified, default to 60)
 
 Be resilient. If some information is not found, leave it as an empty string. If the platform is clearly an app (like Zoom), write the app name.
@@ -285,13 +288,14 @@ Output JSON format strictly:
   "date": "",
   "platform": "",
   "link": "",
+  "meetingId": "",
   "notes": "",
   "durationMinutes": 60
 }
 `;
 
     const data = await callModel(modelConfig, prompt, text, imageBase64);
-    res.json(data);
+    res.json(normalizeParsedInterviewResult(data));
   } catch (error: any) {
     console.error("AI Error:", error);
     const isQuotaError = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('Quota exceeded') || error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('rate limit');
@@ -302,6 +306,21 @@ Output JSON format strictly:
   }
 };
 
+const calendarInvite = (req: express.Request, res: express.Response) => {
+  try {
+    const event = calendarEventFromQuery(req.query as Record<string, unknown>);
+    const ics = createICS(event);
+    const filename = sanitizeCalendarFileName(event.title);
+
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", `inline; filename="${filename}.ics"`);
+    res.status(200).send(ics);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Invalid calendar event" });
+  }
+};
+
 app.post(["/parse-interview", "/api/parse-interview"], parseInterview);
+app.get(["/calendar.ics", "/api/calendar.ics"], calendarInvite);
 
 export default app;

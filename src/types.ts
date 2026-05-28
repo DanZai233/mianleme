@@ -7,6 +7,7 @@ export interface Interview {
   date: string; // ISO 8601
   platform: string;
   link: string;
+  meetingId: string;
   notes: string;
   status: InterviewStatus;
   reminderHours: number; // e.g., 1 for 1 hour before

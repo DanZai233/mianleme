@@ -13,6 +13,10 @@
       "dest": "/api/handler.ts"
     },
     {
+      "src": "/api/calendar.ics",
+      "dest": "/api/handler.ts"
+    },
+    {
       "src": "/(.*)",
       "dest": "dist/$1"
     }

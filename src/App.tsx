@@ -98,7 +98,8 @@ export default function App() {
   const filteredInterviews = useMemo(() => {
     let list = state.interviews.filter(i => {
       const matchesSearch = i.company.toLowerCase().includes(search.toLowerCase()) || 
-                            i.role.toLowerCase().includes(search.toLowerCase());
+                            i.role.toLowerCase().includes(search.toLowerCase()) ||
+                            i.meetingId.toLowerCase().includes(search.toLowerCase());
       if (!matchesSearch) return false;
 
       if (viewMode === 'list') {

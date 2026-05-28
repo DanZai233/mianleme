@@ -17,14 +17,41 @@ const defaultState: AppState = {
   }
 };
 
+function normalizeInterview(interview: Partial<Interview>): Interview {
+  return {
+    id: String(interview.id || `${Date.now()}-${Math.random()}`),
+    company: String(interview.company || ""),
+    role: String(interview.role || ""),
+    date: String(interview.date || ""),
+    platform: String(interview.platform || ""),
+    link: String(interview.link || ""),
+    meetingId: String(interview.meetingId || ""),
+    notes: String(interview.notes || ""),
+    status: interview.status || "upcoming",
+    reminderHours: Number.isFinite(Number(interview.reminderHours)) ? Number(interview.reminderHours) : 1,
+    durationMinutes: Number.isFinite(Number(interview.durationMinutes)) ? Number(interview.durationMinutes) : 60,
+  };
+}
+
+function normalizeState(data: Partial<AppState>): AppState {
+  return {
+    ...defaultState,
+    ...data,
+    interviews: Array.isArray(data.interviews) ? data.interviews.map(normalizeInterview) : [],
+    modelConfig: {
+      ...defaultState.modelConfig,
+      ...(data.modelConfig || {}),
+    },
+  };
+}
+
 export function useAppState() {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Clean up legacy data if needed
-        return { ...defaultState, ...parsed };
+        return normalizeState(parsed);
       } catch (e) {
         console.error("Local storage decode error", e);
         return defaultState;
@@ -76,7 +103,7 @@ export function useAppState() {
   };
 
   const importData = (data: AppState) => {
-    setState(data);
+    setState(normalizeState(data));
   };
 
   return {
