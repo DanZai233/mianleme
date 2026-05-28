@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Interview, Language } from '../types';
 import { useI18n } from '../i18n';
-import { generateICS } from '../utils';
-import { Calendar, Trash2, Edit2, Link as LinkIcon, MapPin, Clock, Share, CheckCircle2 } from 'lucide-react';
+import { addToSystemCalendar, createGoogleCalendarUrl } from '../utils';
+import { Calendar, Trash2, Edit2, MapPin, Clock, Share, CheckCircle2, ExternalLink, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -17,10 +17,19 @@ interface Props {
 
 export function InterviewCard({ interview, lang, onEdit, onComplete, onDelete, hasConflict = false }: Props) {
   const t = useI18n(lang);
+  const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   
   const d = new Date(interview.date);
   const formattedTime = isNaN(d.getTime()) ? '--:--' : format(d, 'HH:mm');
   const formattedDate = isNaN(d.getTime()) ? '-' : format(d, 'EEE, MMM d');
+  const calendarEvent = {
+    title: `${interview.company} - ${interview.role} Interview`,
+    description: interview.notes || 'Interview Notes',
+    location: interview.link || interview.platform || 'Online',
+    dateStr: interview.date,
+    reminderHours: interview.reminderHours,
+    durationMinutes: interview.durationMinutes || 60,
+  };
 
   const handleShare = () => {
     const text = t.shareFormat
@@ -37,6 +46,27 @@ export function InterviewCard({ interview, lang, onEdit, onComplete, onDelete, h
     } else {
       navigator.clipboard.writeText(text);
       toast.success(t.shareSuccess);
+    }
+  };
+
+  const handleGoogleCalendar = () => {
+    try {
+      window.open(createGoogleCalendarUrl(calendarEvent), '_blank', 'noopener,noreferrer');
+      setShowCalendarOptions(false);
+    } catch {
+      toast.error(t.invalidCalendarDate);
+    }
+  };
+
+  const handleSystemCalendar = async () => {
+    try {
+      const result = await addToSystemCalendar(calendarEvent);
+      if (result === 'downloaded') {
+        toast.success(t.calendarFileDownloaded);
+      }
+      setShowCalendarOptions(false);
+    } catch {
+      toast.error(t.invalidCalendarDate);
     }
   };
 
@@ -103,19 +133,30 @@ export function InterviewCard({ interview, lang, onEdit, onComplete, onDelete, h
             </span>
             
             <button 
-              onClick={() => generateICS(
-                `${interview.company} - ${interview.role} Interview`, 
-                interview.notes || 'Interview Notes', 
-                interview.link || interview.platform || 'Online', 
-                interview.date, 
-                interview.reminderHours,
-                interview.durationMinutes || 60
-              )}
+              onClick={() => setShowCalendarOptions((open) => !open)}
               className="text-[12px] font-semibold text-blue-500 flex items-center gap-1 hover:opacity-80 active:opacity-60 transition-opacity"
+              aria-expanded={showCalendarOptions}
             >
               <Calendar size={14} /> {t.addToCalendar}
             </button>
           </div>
+
+          {showCalendarOptions && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={handleGoogleCalendar}
+                className="min-h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-[12px] font-semibold text-blue-600 dark:text-blue-300 flex items-center justify-center gap-1.5 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+              >
+                <ExternalLink size={14} /> {t.googleCalendar}
+              </button>
+              <button
+                onClick={handleSystemCalendar}
+                className="min-h-9 rounded-xl bg-gray-100 dark:bg-white/10 px-3 py-2 text-[12px] font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-1.5 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
+              >
+                <Download size={14} /> {t.appleCalendar}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
