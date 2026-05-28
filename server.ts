@@ -9,12 +9,95 @@ import fetch from "node-fetch";
 // Polyfill fetch for node environments below 18 if needed, but we are assuming node 18+
 // In which case we could just use global fetch, but we'll import it or rely on genai handling it.
 
-async function callModel(modelConfig: any, prompt: string, text: string, imageBase64?: string) {
-  const { provider, apiKey, modelName, apiBase } = modelConfig;
-  
-  if (!apiKey) {
-    throw new Error("API Key is required");
+const PROVIDER_LABELS: Record<string, string> = {
+  google: "Google Gemini",
+  volcengine: "Volcengine Ark",
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+};
+
+function firstEnv(names: string[]) {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
   }
+  return "";
+}
+
+function parseJsonResponse(content: string) {
+  const trimmed = content.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const withoutFence = trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+    const start = withoutFence.indexOf("{");
+    const end = withoutFence.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(withoutFence.slice(start, end + 1));
+    }
+    throw new Error("AI returned non-JSON content");
+  }
+}
+
+function normalizeModelConfig(rawConfig: any) {
+  const provider = rawConfig?.provider || "google";
+  let modelName = String(rawConfig?.modelName || "").trim();
+
+  if (provider === "volcengine" && modelName === "gemini-2.5-flash") {
+    modelName = "";
+  }
+
+  const envByProvider: Record<string, { keys: string[]; models: string[]; bases: string[]; defaultBase?: string; defaultModel?: string }> = {
+    google: {
+      keys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      models: ["GEMINI_MODEL_NAME", "GOOGLE_MODEL_NAME"],
+      bases: [],
+      defaultModel: "gemini-2.5-flash",
+    },
+    volcengine: {
+      keys: ["VOLCENGINE_API_KEY", "ARK_API_KEY"],
+      models: ["VOLCENGINE_MODEL_NAME", "ARK_MODEL", "ARK_MODEL_ID", "ARK_ENDPOINT_ID"],
+      bases: ["VOLCENGINE_API_BASE", "ARK_API_BASE"],
+      defaultBase: "https://ark.cn-beijing.volces.com/api/v3",
+    },
+    openai: {
+      keys: ["OPENAI_API_KEY"],
+      models: ["OPENAI_MODEL_NAME"],
+      bases: ["OPENAI_API_BASE"],
+      defaultBase: "https://api.openai.com/v1",
+      defaultModel: "gpt-4o-mini",
+    },
+    anthropic: {
+      keys: ["ANTHROPIC_API_KEY"],
+      models: ["ANTHROPIC_MODEL_NAME"],
+      bases: ["ANTHROPIC_API_BASE"],
+      defaultBase: "https://api.anthropic.com",
+      defaultModel: "claude-3-5-sonnet-latest",
+    },
+  };
+
+  const envConfig = envByProvider[provider];
+  if (!envConfig) {
+    throw new Error("Unsupported model provider");
+  }
+
+  const apiKey = String(rawConfig?.apiKey || "").trim() || firstEnv(envConfig.keys);
+  const apiBase = String(rawConfig?.apiBase || "").trim() || firstEnv(envConfig.bases) || envConfig.defaultBase;
+  modelName = modelName || firstEnv(envConfig.models) || envConfig.defaultModel || "";
+
+  const label = PROVIDER_LABELS[provider] || provider;
+  if (!apiKey) {
+    throw new Error(`${label} API key is required`);
+  }
+  if (!modelName) {
+    throw new Error(`${label} model name is required`);
+  }
+
+  return { provider, apiKey, modelName, apiBase };
+}
+
+async function callModel(modelConfig: any, prompt: string, text: string, imageBase64?: string) {
+  const { provider, apiKey, modelName, apiBase } = normalizeModelConfig(modelConfig);
 
   // Prepare contents
   let contents: any[] = [];
@@ -47,14 +130,14 @@ async function callModel(modelConfig: any, prompt: string, text: string, imageBa
         }
       });
       if (!response.text) throw new Error("No response from AI");
-      return JSON.parse(response.text);
+      return parseJsonResponse(response.text);
     }
 
     case "volcengine":
     case "openai": {
       const openai = new OpenAI({
         apiKey: apiKey,
-        baseURL: apiBase || (provider === "volcengine" ? "https://ark.cn-beijing.volces.com/api/v3" : "https://api.openai.com/v1"),
+        baseURL: apiBase,
       });
 
       // Convert to OpenAI message format
@@ -85,18 +168,18 @@ async function callModel(modelConfig: any, prompt: string, text: string, imageBa
         model: modelName,
         messages: messages,
         temperature: 0,
-        response_format: { type: "json_object" }
+        ...(provider === "openai" ? { response_format: { type: "json_object" as const } } : {}),
       });
 
       const content = response.choices[0].message.content;
       if (!content) throw new Error("No response from AI");
-      return JSON.parse(content);
+      return parseJsonResponse(content);
     }
 
     case "anthropic": {
       const anthropic = new Anthropic({
         apiKey: apiKey,
-        baseURL: apiBase || "https://api.anthropic.com",
+        baseURL: apiBase,
       });
 
       // Convert to Anthropic message format
@@ -134,7 +217,7 @@ async function callModel(modelConfig: any, prompt: string, text: string, imageBa
 
       const content = response.content[0].type === 'text' ? response.content[0].text : '';
       if (!content) throw new Error("No response from AI");
-      return JSON.parse(content);
+      return parseJsonResponse(content);
     }
 
     default:
@@ -144,7 +227,7 @@ async function callModel(modelConfig: any, prompt: string, text: string, imageBa
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   // Use JSON payload up to 10MB to accommodate base64 images
   app.use(express.json({ limit: "10mb" }));

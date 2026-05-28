@@ -4,6 +4,37 @@ import { Language, ModelConfig, ModelProvider } from '../types';
 import { useI18n } from '../i18n';
 import toast from 'react-hot-toast';
 
+const PROVIDER_DEFAULTS: Record<ModelProvider, { modelName: string; apiBase?: string; apiKeyPlaceholder: string; modelPlaceholder: string; apiBasePlaceholder: string }> = {
+  google: {
+    modelName: 'gemini-2.5-flash',
+    apiKeyPlaceholder: 'AIza...',
+    modelPlaceholder: 'gemini-2.5-flash',
+    apiBasePlaceholder: '',
+  },
+  volcengine: {
+    modelName: '',
+    apiBase: 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKeyPlaceholder: 'ARK_API_KEY',
+    modelPlaceholder: 'ep-... / doubao-seed-1-6-251015',
+    apiBasePlaceholder: 'https://ark.cn-beijing.volces.com/api/v3',
+  },
+  openai: {
+    modelName: 'gpt-4o-mini',
+    apiKeyPlaceholder: 'sk-...',
+    modelPlaceholder: 'gpt-4o-mini',
+    apiBasePlaceholder: 'https://api.openai.com/v1',
+  },
+  anthropic: {
+    modelName: 'claude-3-5-sonnet-latest',
+    apiKeyPlaceholder: 'sk-ant-...',
+    modelPlaceholder: 'claude-3-5-sonnet-latest',
+    apiBasePlaceholder: 'https://api.anthropic.com',
+  },
+};
+
+const KNOWN_DEFAULT_MODELS = new Set(Object.values(PROVIDER_DEFAULTS).map((item) => item.modelName).filter(Boolean));
+const KNOWN_DEFAULT_BASES = new Set(Object.values(PROVIDER_DEFAULTS).map((item) => item.apiBase).filter(Boolean));
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -27,11 +58,27 @@ export function SettingsModal({
   const t = useI18n(lang);
   const [localModelConfig, setLocalModelConfig] = useState<ModelConfig>(modelConfig);
   const [showAiSettings, setShowAiSettings] = useState(false);
+  const currentProviderDefaults = PROVIDER_DEFAULTS[localModelConfig.provider];
 
   const handleSaveModelConfig = () => {
     setModelConfig(localModelConfig);
     toast.success(t.modelConfigSaved);
     setShowAiSettings(false);
+  };
+
+  const handleProviderChange = (provider: ModelProvider) => {
+    setLocalModelConfig((prev) => {
+      const defaults = PROVIDER_DEFAULTS[provider];
+      const shouldReplaceModel = !prev.modelName || KNOWN_DEFAULT_MODELS.has(prev.modelName);
+      const shouldReplaceApiBase = !prev.apiBase || KNOWN_DEFAULT_BASES.has(prev.apiBase);
+
+      return {
+        ...prev,
+        provider,
+        modelName: shouldReplaceModel ? defaults.modelName : prev.modelName,
+        apiBase: shouldReplaceApiBase ? defaults.apiBase : prev.apiBase,
+      };
+    });
   };
 
   if (!isOpen) return null;
@@ -156,7 +203,7 @@ export function SettingsModal({
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t.modelProvider}</label>
                     <select
                       value={localModelConfig.provider}
-                      onChange={(e) => setLocalModelConfig({ ...localModelConfig, provider: e.target.value as ModelProvider })}
+                      onChange={(e) => handleProviderChange(e.target.value as ModelProvider)}
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     >
                       <option value="google">{t.google}</option>
@@ -174,7 +221,7 @@ export function SettingsModal({
                       value={localModelConfig.apiKey}
                       onChange={(e) => setLocalModelConfig({ ...localModelConfig, apiKey: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder="sk-..."
+                      placeholder={currentProviderDefaults.apiKeyPlaceholder}
                     />
                   </div>
 
@@ -186,7 +233,7 @@ export function SettingsModal({
                       value={localModelConfig.modelName}
                       onChange={(e) => setLocalModelConfig({ ...localModelConfig, modelName: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder="gemini-2.5-flash"
+                      placeholder={currentProviderDefaults.modelPlaceholder}
                     />
                   </div>
 
@@ -198,7 +245,7 @@ export function SettingsModal({
                       value={localModelConfig.apiBase || ''}
                       onChange={(e) => setLocalModelConfig({ ...localModelConfig, apiBase: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder="https://ark.cn-beijing.volces.com/api/v3"
+                      placeholder={currentProviderDefaults.apiBasePlaceholder}
                     />
                   </div>
 

@@ -70,10 +70,12 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
         body: JSON.stringify({ text, imageBase64, modelConfig })
       });
       if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        const errorMessage = errorBody?.error || 'Extraction failed';
         if (res.status === 429) {
           throw new Error('Quota Exceeded');
         }
-        throw new Error('Extraction failed');
+        throw new Error(errorMessage);
       }
       const data = await res.json();
       
@@ -93,7 +95,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       if (err.message === 'Quota Exceeded') {
         toast.error(t.quotaExceeded || "AI Quota Exceeded. Please try again later or add manually.");
       } else {
-        toast.error("Extraction failed. Please try manually.");
+        toast.error(err.message || "Extraction failed. Please try manually.");
       }
     } finally {
       setIsExtracting(false);
