@@ -10,7 +10,7 @@ import { Toaster, toast } from 'react-hot-toast';
 import { format, isSameDay, addDays, subDays, eachDayOfInterval, isToday } from 'date-fns';
 
 export default function App() {
-  const { state, addInterview, updateInterview, deleteInterview, setLanguage, importData, setDarkMode, setNotificationsEnabled, setModelConfig } = useAppState();
+  const { state, addInterview, updateInterview, deleteInterview, setLanguage, setTimezone, importData, setDarkMode, setNotificationsEnabled, setModelConfig } = useAppState();
   const t = useI18n(state.language);
   
   const [search, setSearch] = useState('');
@@ -329,6 +329,7 @@ export default function App() {
                 key={interview.id} 
                 interview={interview} 
                 lang={state.language} 
+                timezone={state.timezone}
                 onEdit={(i) => { setEditingData(i); setIsModalOpen(true); }}
                 onComplete={(i) => {
                   updateInterview(i.id, { ...i, status: 'completed' });
@@ -366,6 +367,7 @@ export default function App() {
           lang={state.language} 
           existingInterviews={state.interviews}
           modelConfig={state.modelConfig}
+          timezone={state.timezone}
           onClose={() => setIsModalOpen(false)} 
           onSave={(data) => {
             if (editingData) {
@@ -386,6 +388,8 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         lang={state.language}
         setLang={setLanguage}
+        timezone={state.timezone}
+        setTimezone={setTimezone}
         darkMode={state.darkMode}
         setDarkMode={setDarkMode}
         notificationsEnabled={state.notificationsEnabled}

@@ -38,6 +38,38 @@ function parseJsonResponse(content: string) {
   }
 }
 
+function normalizeTimezone(timezone?: string) {
+  const fallback = "UTC";
+  if (!timezone) return fallback;
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+    return timezone;
+  } catch {
+    return fallback;
+  }
+}
+
+function getDatePartsForTimezone(timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
+
+  return {
+    date: `${value("year")}-${value("month")}-${value("day")}`,
+    dateTime: `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`,
+    year: value("year"),
+  };
+}
+
 function normalizeModelConfig(rawConfig: any) {
   const provider = rawConfig?.provider || "google";
   let modelName = String(rawConfig?.modelName || "").trim();
@@ -227,12 +259,18 @@ async function callModel(modelConfig: any, prompt: string, text: string, imageBa
 const parseInterview = async (req: express.Request, res: express.Response) => {
   try {
     const { text, imageBase64, modelConfig } = req.body;
+    const timezone = normalizeTimezone(req.body?.timezone);
+    const timezoneToday = getDatePartsForTimezone(timezone);
 
     const prompt = `You are an AI assistant that extracts interview details from text or images.
+User timezone: ${timezone}
+Current date in user's timezone: ${timezoneToday.date}
+Current datetime in user's timezone: ${timezoneToday.dateTime}
+
 Extract the following information and return ONLY a valid JSON object:
 - company: string (company name)
 - role: string (job title/position)
-- date: string (ISO 8601 format, e.g., "2026-05-28T14:30:00Z". If no year is specified, assume ${new Date().getFullYear()})
+- date: string (local datetime in the user's timezone, format "YYYY-MM-DDTHH:mm", no seconds, no timezone suffix. If no year is specified, assume ${timezoneToday.year}. If the source explicitly mentions another timezone, convert it to ${timezone}. If no timezone is mentioned, assume ${timezone})
 - platform: string (e.g., Zoom, Teams, Google Meet, Tencent Meeting, Phone, On-site, etc.)
 - link: string (the meeting link, URL, meeting ID, or meeting number. If no URL is available but a meeting ID is, put it here)
 - notes: string (any passcodes, passwords, or additional instructions. Separate points with newlines)

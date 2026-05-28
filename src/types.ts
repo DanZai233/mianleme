@@ -27,6 +27,7 @@ export interface ModelConfig {
 export interface AppState {
   interviews: Interview[];
   language: Language;
+  timezone: string;
   darkMode: boolean;
   notificationsEnabled: boolean;
   modelConfig: ModelConfig;

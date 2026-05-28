@@ -9,13 +9,14 @@ import toast from 'react-hot-toast';
 interface Props {
   interview: Interview;
   lang: Language;
+  timezone: string;
   onEdit: (i: Interview) => void;
   onComplete?: (i: Interview) => void;
   onDelete: (id: string) => void;
   hasConflict?: boolean;
 }
 
-export function InterviewCard({ interview, lang, onEdit, onComplete, onDelete, hasConflict = false }: Props) {
+export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, onDelete, hasConflict = false }: Props) {
   const t = useI18n(lang);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
   
@@ -29,6 +30,7 @@ export function InterviewCard({ interview, lang, onEdit, onComplete, onDelete, h
     dateStr: interview.date,
     reminderHours: interview.reminderHours,
     durationMinutes: interview.durationMinutes || 60,
+    timezone,
   };
 
   const handleShare = () => {

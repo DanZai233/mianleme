@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Moon, Sun, Globe, Download, Upload, Bell, ChevronRight, Check, Brain } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { X, Moon, Sun, Globe, Download, Upload, Bell, ChevronRight, Check, Brain, Clock3 } from 'lucide-react';
 import { Language, ModelConfig, ModelProvider } from '../types';
 import { useI18n } from '../i18n';
 import toast from 'react-hot-toast';
@@ -35,11 +35,34 @@ const PROVIDER_DEFAULTS: Record<ModelProvider, { modelName: string; apiBase?: st
 const KNOWN_DEFAULT_MODELS = new Set(Object.values(PROVIDER_DEFAULTS).map((item) => item.modelName).filter(Boolean));
 const KNOWN_DEFAULT_BASES = new Set(Object.values(PROVIDER_DEFAULTS).map((item) => item.apiBase).filter(Boolean));
 
+const FALLBACK_TIMEZONES = [
+  'Asia/Shanghai',
+  'Asia/Hong_Kong',
+  'Asia/Taipei',
+  'Asia/Tokyo',
+  'Asia/Singapore',
+  'Europe/London',
+  'Europe/Paris',
+  'America/Los_Angeles',
+  'America/New_York',
+  'Australia/Sydney',
+  'UTC',
+];
+
+function getTimezoneOptions(currentTimezone: string) {
+  const supported = (Intl as any).supportedValuesOf?.('timeZone') as string[] | undefined;
+  const options = supported?.length ? supported : FALLBACK_TIMEZONES;
+  const withCurrent = options.includes(currentTimezone) ? options : [currentTimezone, ...options];
+  return [...withCurrent].sort((a, b) => a.localeCompare(b));
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   lang: Language;
   setLang: (l: Language) => void;
+  timezone: string;
+  setTimezone: (timezone: string) => void;
   darkMode: boolean;
   setDarkMode: (d: boolean) => void;
   notificationsEnabled: boolean;
@@ -53,12 +76,13 @@ interface Props {
 export function SettingsModal({
   isOpen, onClose, lang, setLang, darkMode, setDarkMode,
   notificationsEnabled, requestNotifications, onExport, onImport,
-  modelConfig, setModelConfig
+  modelConfig, setModelConfig, timezone, setTimezone
 }: Props) {
   const t = useI18n(lang);
   const [localModelConfig, setLocalModelConfig] = useState<ModelConfig>(modelConfig);
   const [showAiSettings, setShowAiSettings] = useState(false);
   const currentProviderDefaults = PROVIDER_DEFAULTS[localModelConfig.provider];
+  const timezoneOptions = useMemo(() => getTimezoneOptions(timezone), [timezone]);
 
   const handleSaveModelConfig = () => {
     setModelConfig(localModelConfig);
@@ -118,6 +142,23 @@ export function SettingsModal({
                   <ChevronRight size={18} />
                 </div>
               </button>
+
+              {/* Timezone Row */}
+              <div className="w-full flex items-center justify-between gap-3 p-4 border-b border-gray-100 dark:border-white/5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-teal-500 flex items-center justify-center text-white shrink-0"><Clock3 size={18} /></div>
+                  <span className="font-medium text-black dark:text-white">{t.timezone}</span>
+                </div>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="max-w-[210px] min-w-0 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] text-xs text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  {timezoneOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* Notifications Row */}
               <button onClick={requestNotifications} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">

@@ -4,6 +4,7 @@ import { useI18n } from '../i18n';
 import { v4 as uuidv4 } from 'uuid';
 import { X, Sparkles, Image as ImageIcon, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatDateTimeForTimezone, normalizeExtractedDate } from '../utils';
 
 interface Props {
   initialData?: Interview | null;
@@ -12,9 +13,10 @@ interface Props {
   onSave: (i: Interview) => void;
   existingInterviews: Interview[];
   modelConfig: ModelConfig;
+  timezone: string;
 }
 
-export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, modelConfig }: Props) {
+export function AddInterviewModal({ initialData, lang, onClose, onSave, existingInterviews, modelConfig, timezone }: Props) {
   const t = useI18n(lang);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -23,7 +25,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       id: uuidv4(),
       company: '',
       role: '',
-      date: new Date().toISOString().slice(0, 16),
+      date: formatDateTimeForTimezone(new Date(), timezone),
       platform: '',
       link: '',
       notes: '',
@@ -67,7 +69,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       const res = await fetch('/api/parse-interview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, imageBase64, modelConfig })
+        body: JSON.stringify({ text, imageBase64, modelConfig, timezone })
       });
       if (!res.ok) {
         const errorBody = await res.json().catch(() => null);
@@ -83,7 +85,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
         ...prev,
         company: data.company || prev.company,
         role: data.role || prev.role,
-        date: data.date ? data.date.slice(0, 16) : prev.date,
+        date: normalizeExtractedDate(data.date, timezone) || prev.date,
         platform: data.platform || prev.platform,
         link: data.link || prev.link,
         notes: data.notes || prev.notes,

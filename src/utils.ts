@@ -12,6 +12,7 @@ interface CalendarEventInput {
   dateStr: string;
   reminderHours: number;
   durationMinutes?: number;
+  timezone?: string;
 }
 
 // Format Date as yyyyMMddTHHmmssZ for ICS and calendar URLs.
@@ -21,6 +22,64 @@ function formatDateICS(dateStr: string | Date) {
     throw new Error("Invalid calendar date");
   }
   return d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+export function getBrowserTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+export function isValidTimezone(timezone: string) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeTimezone(timezone?: string) {
+  return timezone && isValidTimezone(timezone) ? timezone : getBrowserTimezone();
+}
+
+export function formatDateTimeForTimezone(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: normalizeTimezone(timezone),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
+
+  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
+}
+
+export function normalizeExtractedDate(dateValue: unknown, timezone: string) {
+  if (!dateValue) return "";
+  const value = String(dateValue).trim();
+  if (!value) return "";
+
+  const localDateTime = value.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+  const hasExplicitZone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+
+  if (localDateTime && !hasExplicitZone) {
+    return `${localDateTime[1]}T${localDateTime[2]}`;
+  }
+
+  const parsed = new Date(value);
+  if (!isNaN(parsed.getTime())) {
+    return formatDateTimeForTimezone(parsed, timezone);
+  }
+
+  return "";
+}
+
+function formatLocalDateICS(date: Date) {
+  const pad = (value: number) => value.toString().padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
 function escapeICSText(value: string) {
@@ -42,6 +101,7 @@ export function createICS({
   dateStr,
   reminderHours,
   durationMinutes = 60,
+  timezone: eventTimezoneName,
 }: CalendarEventInput) {
   const startDate = new Date(dateStr);
   if (isNaN(startDate.getTime())) {
@@ -50,8 +110,13 @@ export function createICS({
 
   const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
   
-  const formattedStart = formatDateICS(startDate);
-  const formattedEnd = formatDateICS(endDate);
+  const timezone = eventTimezone(timezoneFallback(eventTimezoneName));
+  const useTimezone = Boolean(timezone);
+  const formattedStart = useTimezone ? formatLocalDateICS(startDate) : formatDateICS(startDate);
+  const formattedEnd = useTimezone ? formatLocalDateICS(endDate) : formatDateICS(endDate);
+  const formattedTimestamp = formatDateICS(new Date());
+  const startKey = useTimezone ? `DTSTART;TZID=${timezone}` : "DTSTART";
+  const endKey = useTimezone ? `DTEND;TZID=${timezone}` : "DTEND";
   
   const uid = Date.now().toString() + "@interviewtracker.local";
 
@@ -72,9 +137,9 @@ PRODID:-//InterviewTracker//EN
 CALSCALE:GREGORIAN
 BEGIN:VEVENT
 UID:${uid}
-DTSTAMP:${formattedStart}
-DTSTART:${formattedStart}
-DTEND:${formattedEnd}
+DTSTAMP:${formattedTimestamp}
+${startKey}:${formattedStart}
+${endKey}:${formattedEnd}
 SUMMARY:${escapeICSText(title)}
 DESCRIPTION:${escapeICSText(description)}
 LOCATION:${escapeICSText(location)}
@@ -90,15 +155,27 @@ export function createGoogleCalendarUrl(event: CalendarEventInput) {
   }
 
   const endDate = new Date(startDate.getTime() + (event.durationMinutes || 60) * 60 * 1000);
+  const timezone = eventTimezone(timezoneFallback(event.timezone));
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: event.title,
-    dates: `${formatDateICS(startDate)}/${formatDateICS(endDate)}`,
+    dates: timezone ? `${formatLocalDateICS(startDate)}/${formatLocalDateICS(endDate)}` : `${formatDateICS(startDate)}/${formatDateICS(endDate)}`,
     details: event.description,
     location: event.location,
   });
+  if (timezone) {
+    params.set("ctz", timezone);
+  }
 
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function timezoneFallback(timezone?: string) {
+  return timezone && isValidTimezone(timezone) ? timezone : "";
+}
+
+function eventTimezone(timezone: string) {
+  return timezone;
 }
 
 function downloadICS(event: CalendarEventInput) {

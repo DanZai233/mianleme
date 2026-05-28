@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { AppState, Interview, Language, ModelConfig } from "./types";
+import { getBrowserTimezone } from "./utils";
 
 const STORAGE_KEY = "interview_tracker_data";
 
 const defaultState: AppState = {
   interviews: [],
   language: "zh",
+  timezone: getBrowserTimezone(),
   darkMode: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
   notificationsEnabled: false,
   modelConfig: {
@@ -57,6 +59,10 @@ export function useAppState() {
     setState((s) => ({ ...s, language: lang }));
   };
 
+  const setTimezone = (timezone: string) => {
+    setState((s) => ({ ...s, timezone }));
+  };
+
   const setDarkMode = (darkMode: boolean) => {
     setState((s) => ({ ...s, darkMode }));
   };
@@ -79,6 +85,7 @@ export function useAppState() {
     updateInterview,
     deleteInterview,
     setLanguage,
+    setTimezone,
     setDarkMode,
     setNotificationsEnabled,
     setModelConfig,
