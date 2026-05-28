@@ -2,8 +2,6 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { calendarEventFromQuery, createICS, sanitizeCalendarFileName } from "../src/calendar";
-import { normalizeParsedInterviewResult } from "../src/parseResult";
 
 const app = express();
 
@@ -16,6 +14,173 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
 };
+
+interface CalendarEventInput {
+  title: string;
+  description: string;
+  location: string;
+  dateStr: string;
+  reminderHours: number;
+  durationMinutes?: number;
+  timezone?: string;
+}
+
+function formatDateICS(dateStr: string | Date) {
+  const d = dateStr instanceof Date ? dateStr : new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    throw new Error("Invalid calendar date");
+  }
+  return d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+function formatLocalDateICS(date: Date) {
+  const pad = (value: number) => value.toString().padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+function escapeICSText(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function sanitizeCalendarFileName(value: string) {
+  return value.replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, "_").slice(0, 80) || "calendar-event";
+}
+
+function timezoneFallback(timezone?: string) {
+  if (!timezone) return "";
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+    return timezone;
+  } catch {
+    return "";
+  }
+}
+
+function createICS({
+  title,
+  description,
+  location,
+  dateStr,
+  reminderHours,
+  durationMinutes = 60,
+  timezone: eventTimezoneName,
+}: CalendarEventInput) {
+  const startDate = new Date(dateStr);
+  if (isNaN(startDate.getTime())) {
+    throw new Error("Invalid calendar date");
+  }
+
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+  const timezone = timezoneFallback(eventTimezoneName);
+  const useTimezone = Boolean(timezone);
+  const formattedStart = useTimezone ? formatLocalDateICS(startDate) : formatDateICS(startDate);
+  const formattedEnd = useTimezone ? formatLocalDateICS(endDate) : formatDateICS(endDate);
+  const formattedTimestamp = formatDateICS(new Date());
+  const startKey = useTimezone ? `DTSTART;TZID=${timezone}` : "DTSTART";
+  const endKey = useTimezone ? `DTEND;TZID=${timezone}` : "DTEND";
+  const calendarTimezone = useTimezone ? `X-WR-TIMEZONE:${timezone}` : "";
+  const uid = `${Date.now()}@mianleme.app`;
+
+  let alarmStr = "";
+  if (reminderHours > 0) {
+    alarmStr = `
+BEGIN:VALARM
+TRIGGER:-PT${reminderHours}H
+ACTION:DISPLAY
+DESCRIPTION:${escapeICSText(`Reminder: ${title}`)}
+END:VALARM`;
+  }
+
+  return `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//MianLeMe//Interview Calendar//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+${calendarTimezone}
+BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${formattedTimestamp}
+${startKey}:${formattedStart}
+${endKey}:${formattedEnd}
+SUMMARY:${escapeICSText(title)}
+DESCRIPTION:${escapeICSText(description)}
+LOCATION:${escapeICSText(location)}
+${alarmStr.trim()}
+END:VEVENT
+END:VCALENDAR`;
+}
+
+function textParam(raw: Record<string, unknown>, key: string, fallback = "") {
+  const value = raw[key];
+  if (Array.isArray(value)) {
+    return value.length ? String(value[0] || fallback) : fallback;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value == null) {
+    return fallback;
+  }
+  return String(value);
+}
+
+function numberParam(raw: Record<string, unknown>, key: string, fallback: number) {
+  const parsed = Number(textParam(raw, key));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function calendarEventFromQuery(raw: Record<string, unknown>): CalendarEventInput {
+  return {
+    title: textParam(raw, "title", "Interview"),
+    description: textParam(raw, "description"),
+    location: textParam(raw, "location"),
+    dateStr: textParam(raw, "dateStr"),
+    reminderHours: numberParam(raw, "reminderHours", 0),
+    durationMinutes: numberParam(raw, "durationMinutes", 60),
+    timezone: textParam(raw, "timezone"),
+  };
+}
+
+function looksLikeUrl(value: string) {
+  return /^[a-z][a-z0-9+.-]*:/i.test(value);
+}
+
+function cleanMeetingId(value: string) {
+  const trimmed = value.trim();
+  const separatorIndex = trimmed.search(/[:：]/);
+  if (separatorIndex >= 0 && separatorIndex <= 30) {
+    return trimmed.slice(separatorIndex + 1).trim();
+  }
+  return trimmed;
+}
+
+function normalizeParsedInterviewResult(data: any) {
+  if (!data || typeof data !== "object") {
+    return data;
+  }
+
+  const link = String(data.link || "").trim();
+  const meetingId = String(data.meetingId || "").trim();
+
+  if (!meetingId && link && !looksLikeUrl(link)) {
+    return {
+      ...data,
+      link: "",
+      meetingId: cleanMeetingId(link),
+    };
+  }
+
+  return {
+    ...data,
+    link,
+    meetingId,
+  };
+}
 
 function firstEnv(names: string[]) {
   for (const name of names) {
