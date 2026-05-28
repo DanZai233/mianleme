@@ -174,7 +174,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
                   className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-300 text-white py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm"
                 >
                   {isExtracting ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                  {isExtracting ? t.extracting : "Extract Text"}
+                  {isExtracting ? t.extracting : t.extractText}
                 </button>
                 <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={onImageUpload} />
                 <button 
