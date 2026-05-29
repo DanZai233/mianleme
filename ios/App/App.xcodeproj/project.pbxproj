@@ -11,6 +11,7 @@
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
+		7D3A22192C5F4A9D00A10000 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A22182C5F4A9D00A10000 /* MainViewController.swift */; };
 		7D3A221B2C5F4A9D00A10001 /* NativeCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A221A2C5F4A9D00A10001 /* NativeCalendarPlugin.swift */; };
 		7D3A222B2C5F4A9D00A10002 /* NativeReminderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A222A2C5F4A9D00A10002 /* NativeReminderPlugin.swift */; };
 		7D3A222D2C5F4A9D00A10003 /* NativeWidgetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A222C2C5F4A9D00A10003 /* NativeWidgetPlugin.swift */; };
@@ -62,6 +63,7 @@
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		7D3A22182C5F4A9D00A10000 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		7D3A221A2C5F4A9D00A10001 /* NativeCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCalendarPlugin.swift; sourceTree = "<group>"; };
 		7D3A222A2C5F4A9D00A10002 /* NativeReminderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeReminderPlugin.swift; sourceTree = "<group>"; };
 		7D3A222C2C5F4A9D00A10003 /* NativeWidgetPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWidgetPlugin.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				7D3A22302C5F4A9D00A10005 /* App.entitlements */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				7D3A22182C5F4A9D00A10000 /* MainViewController.swift */,
 				7D3A221A2C5F4A9D00A10001 /* NativeCalendarPlugin.swift */,
 				7D3A222A2C5F4A9D00A10002 /* NativeReminderPlugin.swift */,
 				7D3A222C2C5F4A9D00A10003 /* NativeWidgetPlugin.swift */,
@@ -313,6 +316,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				7D3A22192C5F4A9D00A10000 /* MainViewController.swift in Sources */,
 				7D3A221B2C5F4A9D00A10001 /* NativeCalendarPlugin.swift in Sources */,
 				7D3A222B2C5F4A9D00A10002 /* NativeReminderPlugin.swift in Sources */,
 				7D3A222D2C5F4A9D00A10003 /* NativeWidgetPlugin.swift in Sources */,
@@ -487,7 +491,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = H95389Z2AQ;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -511,7 +515,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = H95389Z2AQ;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -535,7 +539,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = MianlemeWidget/MianlemeWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = H95389Z2AQ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MianlemeWidget/Info.plist;
@@ -556,7 +560,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = MianlemeWidget/MianlemeWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = H95389Z2AQ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MianlemeWidget/Info.plist;
@@ -578,7 +582,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = MianlemeShare/MianlemeShare.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = H95389Z2AQ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MianlemeShare/Info.plist;
@@ -599,7 +603,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = MianlemeShare/MianlemeShare.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = H95389Z2AQ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MianlemeShare/Info.plist;

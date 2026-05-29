@@ -113,10 +113,26 @@ export default function App() {
   }, [checkedNativeShare, t.shareImportReady]);
 
   useEffect(() => {
-    syncWidgetSnapshot(state.interviews, state.timezone, state.language).catch(() => {});
+    const syncWidgets = () => {
+      syncWidgetSnapshot(state.interviews, state.timezone, state.language).catch((error) => {
+        console.warn('Native widget sync failed', error);
+      });
+    };
+
+    syncWidgets();
     if (state.notificationsEnabled) {
       syncNativeInterviewReminders(state.interviews, state.language, state.timezone).catch(() => {});
     }
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') syncWidgets();
+    };
+    window.addEventListener('focus', syncWidgets);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', syncWidgets);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [state.interviews, state.timezone, state.language, state.notificationsEnabled]);
 
   useEffect(() => {

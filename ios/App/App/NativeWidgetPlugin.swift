@@ -22,14 +22,17 @@ public class NativeWidgetPlugin: CAPPlugin, CAPBridgedPlugin {
         do {
             let data = try JSONSerialization.data(withJSONObject: snapshot, options: [])
             UserDefaults.standard.set(data, forKey: snapshotKey)
-            if let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-                sharedDefaults.set(data, forKey: snapshotKey)
-                sharedDefaults.synchronize()
+            guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
+                call.reject("widget-app-group-unavailable")
+                return
             }
+
+            sharedDefaults.set(data, forKey: snapshotKey)
+            sharedDefaults.synchronize()
             if #available(iOS 14.0, *) {
                 WidgetCenter.shared.reloadAllTimelines()
             }
-            call.resolve()
+            call.resolve(["updated": true])
         } catch {
             call.reject(error.localizedDescription)
         }
