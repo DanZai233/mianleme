@@ -13,7 +13,7 @@ import { apiUrl } from "./api";
 export { createGoogleCalendarUrl, createICS };
 export type { CalendarEventInput };
 
-type CalendarAddResult = "native" | "browser";
+type CalendarAddResult = "native" | "native-canceled" | "browser";
 
 interface NativeCalendarEvent {
   title: string;
@@ -26,7 +26,7 @@ interface NativeCalendarEvent {
 }
 
 interface NativeCalendarPlugin {
-  addEvent(options: NativeCalendarEvent): Promise<{ eventIdentifier?: string }>;
+  addEvent(options: NativeCalendarEvent): Promise<{ eventIdentifier?: string; action?: "saved" | "canceled" | "deleted" | "unknown" }>;
 }
 
 const NativeCalendar = registerPlugin<NativeCalendarPlugin>("NativeCalendar");
@@ -93,7 +93,7 @@ export async function addToSystemCalendar(event: CalendarEventInput): Promise<Ca
 
   if (Capacitor.getPlatform() === "ios" && Capacitor.isNativePlatform()) {
     try {
-      await NativeCalendar.addEvent({
+      const result = await NativeCalendar.addEvent({
         title: event.title,
         notes: event.description,
         location: event.location,
@@ -102,6 +102,9 @@ export async function addToSystemCalendar(event: CalendarEventInput): Promise<Ca
         timezone: event.timezone || "",
         reminderMinutes: Math.max(0, Math.round((event.reminderHours || 0) * 60)),
       });
+      if (result.action && result.action !== "saved") {
+        return "native-canceled";
+      }
       return "native";
     } catch (error: any) {
       const message = String(error?.message || error || "");

@@ -1,9 +1,10 @@
 import Capacitor
 import EventKit
+import EventKitUI
 import Foundation
 
 @objc(NativeCalendarPlugin)
-public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
+public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewDelegate {
     public let identifier = "NativeCalendarPlugin"
     public let jsName = "NativeCalendar"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -11,8 +12,16 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private let eventStore = EKEventStore()
+    private var pendingCall: CAPPluginCall?
 
     @objc func addEvent(_ call: CAPPluginCall) {
+        if #available(iOS 17.0, *) {
+            DispatchQueue.main.async { [weak self] in
+                self?.presentEventEditor(call)
+            }
+            return
+        }
+
         requestCalendarAccess { [weak self] granted, error in
             guard let self else { return }
             if let error {
@@ -41,7 +50,43 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @available(iOS 17.0, *)
+    private func presentEventEditor(_ call: CAPPluginCall) {
+        guard pendingCall == nil else {
+            call.reject("calendar editor already open")
+            return
+        }
+
+        do {
+            let event = try buildEvent(call)
+            guard let presentingViewController = bridge?.viewController else {
+                call.reject("calendar presenter unavailable")
+                return
+            }
+
+            let editor = EKEventEditViewController()
+            editor.eventStore = eventStore
+            editor.event = event
+            editor.editViewDelegate = self
+
+            pendingCall = call
+            presentingViewController.present(editor, animated: true)
+        } catch {
+            call.reject(error.localizedDescription)
+        }
+    }
+
     private func saveEvent(_ call: CAPPluginCall) throws -> String? {
+        let event = try buildEvent(call)
+        guard event.calendar != nil else {
+            throw CalendarPluginError.noDefaultCalendar
+        }
+
+        try eventStore.save(event, span: .thisEvent, commit: true)
+        return event.eventIdentifier
+    }
+
+    private func buildEvent(_ call: CAPPluginCall) throws -> EKEvent {
         guard let title = call.getString("title"), !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CalendarPluginError.invalidTitle
         }
@@ -52,12 +97,9 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
               endDate > startDate else {
             throw CalendarPluginError.invalidDate
         }
-        guard let calendar = eventStore.defaultCalendarForNewEvents else {
-            throw CalendarPluginError.noDefaultCalendar
-        }
 
         let event = EKEvent(eventStore: eventStore)
-        event.calendar = calendar
+        event.calendar = eventStore.defaultCalendarForNewEvents
         event.title = title
         event.notes = call.getString("notes") ?? ""
         event.location = call.getString("location") ?? ""
@@ -73,8 +115,7 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
             event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-reminderMinutes * 60)))
         }
 
-        try eventStore.save(event, span: .thisEvent, commit: true)
-        return event.eventIdentifier
+        return event
     }
 
     private func parseISODate(_ value: String) -> Date? {
@@ -85,6 +126,29 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         formatter.formatOptions = [.withInternetDateTime]
         return formatter.date(from: value)
+    }
+
+    public func eventEditViewController(_ controller: EKEventEditViewController, didCompleteWith action: EKEventEditViewAction) {
+        let actionName: String
+        switch action {
+        case .saved:
+            actionName = "saved"
+        case .canceled:
+            actionName = "canceled"
+        case .deleted:
+            actionName = "deleted"
+        @unknown default:
+            actionName = "unknown"
+        }
+
+        let eventIdentifier = controller.event?.eventIdentifier ?? ""
+        controller.dismiss(animated: true) { [weak self] in
+            self?.pendingCall?.resolve([
+                "action": actionName,
+                "eventIdentifier": eventIdentifier
+            ])
+            self?.pendingCall = nil
+        }
     }
 }
 

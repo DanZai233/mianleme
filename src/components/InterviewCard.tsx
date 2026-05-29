@@ -160,6 +160,10 @@ export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, o
     try {
       if (!hasValidDate) throw new Error('Invalid calendar date');
       const result = await addToSystemCalendar(calendarEvent);
+      if (result === 'native-canceled') {
+        setShowCalendarOptions(false);
+        return;
+      }
       toast.success(result === 'native' ? t.calendarAdded : t.calendarFileDownloaded);
       setShowCalendarOptions(false);
     } catch (error: any) {
