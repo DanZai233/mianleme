@@ -188,6 +188,16 @@ function normalizeParsedInterviewResult(data: any) {
   };
 }
 
+function normalizeMarkdownDocumentOutput(data: any, fallbackTitle: string) {
+  const content = typeof data === "string" ? data : String(data?.content || "");
+  return {
+    generatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    title: String(data?.title || fallbackTitle),
+    content: content.trim(),
+  };
+}
+
 function firstEnv(names: string[]) {
   for (const name of names) {
     const value = process.env[name]?.trim();
@@ -407,7 +417,7 @@ async function callModel(prompt: string, text: string, imageBase64?: string) {
 
       const response = await anthropic.messages.create({
         model: modelName,
-        max_tokens: 1024,
+        max_tokens: 4096,
         temperature: 0,
         messages: messages,
       });
@@ -471,6 +481,183 @@ Output JSON format strictly:
   }
 };
 
+const generatePrepPack = async (req: express.Request, res: express.Response) => {
+  try {
+    const interview = req.body?.interview || {};
+    const lang = req.body?.lang === "en" ? "en" : "zh";
+    const timezone = normalizeTimezone(req.body?.timezone);
+    const prompt = lang === "zh"
+      ? `你是一个严谨、具体、可执行的求职面试教练。请根据面试信息生成一份尽可能详细的 Markdown 准备包，只返回 JSON。
+
+准备包必须包含这些 Markdown 章节：
+# 面试准备包
+## 1. 面试信息摘要
+## 2. 岗位能力画像
+## 3. 公司/业务理解框架
+## 4. 高频问题与答题要点（至少 10 个）
+## 5. 技术/业务深挖问题（至少 8 个）
+## 6. STAR 案例库（至少 5 个，每个包含背景、行动、结果、可量化亮点）
+## 7. 可反问面试官的问题（至少 8 个，按 HR/技术/业务/团队分类）
+## 8. 面试前 30 分钟检查清单
+## 9. 风险点与补救话术
+## 10. 会议/链接/备注核对
+
+要求：
+- 内容要具体、可直接照着准备，移动端阅读友好。
+- 不要编造公司不存在的事实；缺信息时写“需要确认”并给出确认方法。
+- 结合公司、岗位、阶段、备注、会议平台、面试时间和时区。
+- 输出 JSON only，不要 Markdown 代码块。
+
+输出格式：
+{
+  "title": "xxx 面试准备包",
+  "content": "# 面试准备包\\n..."
+}`
+      : `You are a rigorous, specific, actionable interview coach. Generate a detailed Markdown prep pack from the interview data and return JSON only.
+
+The Markdown must include:
+# Interview Prep Pack
+## 1. Interview Summary
+## 2. Role Competency Map
+## 3. Company / Business Understanding Framework
+## 4. Likely Questions and Answer Angles (at least 10)
+## 5. Deep-Dive Technical / Business Questions (at least 8)
+## 6. STAR Story Bank (at least 5, each with situation, action, result, measurable proof)
+## 7. Questions to Ask the Interviewer (at least 8, grouped by HR/technical/business/team)
+## 8. 30-Minute Pre-Interview Checklist
+## 9. Risks and Recovery Talking Points
+## 10. Meeting / Link / Notes Verification
+
+Requirements:
+- Be specific, practical, and mobile-friendly.
+- Do not invent company facts; mark unknowns as "to confirm" and explain how to confirm.
+- Use company, role, stage, notes, platform, meeting time, and timezone.
+- Return JSON only. Do not wrap it in a Markdown fence.
+
+Output:
+{
+  "title": "xxx Interview Prep Pack",
+  "content": "# Interview Prep Pack\\n..."
+}`;
+
+    const data = await callModel(prompt, JSON.stringify({ timezone, interview }, null, 2));
+    res.json(normalizeMarkdownDocumentOutput(data, lang === "zh" ? "面试准备包" : "Interview Prep Pack"));
+  } catch (error: any) {
+    console.error("Prep Pack Error:", error);
+    res.status(500).json({ error: error?.message || "生成准备包失败" });
+  }
+};
+
+const generateFollowUpMessage = async (req: express.Request, res: express.Response) => {
+  try {
+    const interview = req.body?.interview || {};
+    const lang = req.body?.lang === "en" ? "en" : "zh";
+    const prompt = lang === "zh"
+      ? `你是一个专业、自然、不油腻的求职沟通助手。根据面试信息、结果和面后评论，生成可复制的 Markdown 跟进模板文档，只返回 JSON。
+
+要求：
+- thankYou: 面试后 24 小时内发送的感谢消息，简洁真诚。
+- progressCheck: 过了跟进时间后询问进度的消息，礼貌不催促。
+- addendum: 用于补充材料或补充回答的消息。
+- englishFollowUp: 英文跟进消息，语气专业。
+- 不要出现占位符，信息不足时写得通用一些。
+- Markdown 文档需要包含每个模板的适用场景、发送时机、正文。
+
+输出格式：
+{
+  "title": "xxx 跟进模板",
+  "content": "# 感谢/跟进模板\\n..."
+}`
+      : `You are a professional job-search communication assistant. Generate a copy-ready Markdown follow-up template document from the interview data, result, and review. Return JSON only.
+
+Requirements:
+- thankYou: a concise thank-you note within 24 hours after the interview.
+- progressCheck: a polite status check after the follow-up date.
+- addendum: a note for sharing additional material or clarifying an answer.
+- englishFollowUp: a polished English follow-up note.
+- Do not use placeholders; keep it useful when details are missing.
+- The Markdown must include use case, timing, and body for each template.
+
+Output:
+{
+  "title": "xxx Follow-up Templates",
+  "content": "# Follow-up Templates\\n..."
+}`;
+
+    const data = await callModel(prompt, JSON.stringify({ interview }, null, 2));
+    res.json(normalizeMarkdownDocumentOutput(data, lang === "zh" ? "感谢/跟进模板" : "Follow-up Templates"));
+  } catch (error: any) {
+    console.error("Follow-up Template Error:", error);
+    res.status(500).json({ error: error?.message || "生成跟进模板失败" });
+  }
+};
+
+const chatDocument = async (req: express.Request, res: express.Response) => {
+  try {
+    const interview = req.body?.interview || {};
+    const document = req.body?.document || {};
+    const message = String(req.body?.message || "").trim();
+    const lang = req.body?.lang === "en" ? "en" : "zh";
+    const timezone = normalizeTimezone(req.body?.timezone);
+    const documentType = req.body?.documentType === "followUp" ? "followUp" : "prep";
+    if (!message) {
+      return res.status(400).json({ error: lang === "zh" ? "请输入修改要求" : "Please enter a request" });
+    }
+
+    const prompt = lang === "zh"
+      ? `你是面试文档编辑助手。请根据用户要求回答问题，并在有必要时修改当前 Markdown 文档。
+
+规则：
+- 如果用户只是提问，reply 回答，content 可以保持原文。
+- 如果用户要求修改/补充/润色，请直接返回完整更新后的 Markdown 文档。
+- 准备包文档要尽可能详细、具体、可执行。
+- 不要编造公司事实；不确定处标记“需要确认”。
+- 只返回 JSON。
+
+输出格式：
+{
+  "reply": "给用户的简短说明",
+  "title": "文档标题",
+  "content": "完整 Markdown 文档"
+}`
+      : `You are an interview document editing assistant. Answer the user's request and update the current Markdown document when useful.
+
+Rules:
+- If the user only asks a question, answer in reply and keep content unchanged.
+- If the user asks to edit, expand, or polish, return the complete updated Markdown document.
+- Prep documents should be detailed, specific, and actionable.
+- Do not invent company facts; mark uncertain facts as "to confirm".
+- Return JSON only.
+
+Output:
+{
+  "reply": "short response to the user",
+  "title": "document title",
+  "content": "complete Markdown document"
+}`;
+
+    const data = await callModel(prompt, JSON.stringify({
+      timezone,
+      documentType,
+      interview,
+      document,
+      userRequest: message,
+    }, null, 2));
+
+    const normalized = normalizeMarkdownDocumentOutput(data, document.title || (documentType === "prep" ? "Interview Prep Pack" : "Follow-up Templates"));
+    res.json({
+      reply: String(data?.reply || (lang === "zh" ? "已更新文档" : "Document updated")),
+      document: {
+        ...normalized,
+        generatedAt: String(document.generatedAt || normalized.generatedAt),
+      },
+    });
+  } catch (error: any) {
+    console.error("Document Chat Error:", error);
+    res.status(500).json({ error: error?.message || "AI 文档处理失败" });
+  }
+};
+
 const calendarInvite = (req: express.Request, res: express.Response) => {
   try {
     const event = calendarEventFromQuery(req.query as Record<string, unknown>);
@@ -486,6 +673,9 @@ const calendarInvite = (req: express.Request, res: express.Response) => {
 };
 
 app.post(["/parse-interview", "/api/parse-interview"], parseInterview);
+app.post(["/generate-prep-pack", "/api/generate-prep-pack"], generatePrepPack);
+app.post(["/generate-followup-message", "/api/generate-followup-message"], generateFollowUpMessage);
+app.post(["/chat-document", "/api/chat-document"], chatDocument);
 app.get(["/calendar.ics", "/api/calendar.ics"], calendarInvite);
 
 export default app;

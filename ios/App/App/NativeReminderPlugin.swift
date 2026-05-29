@@ -13,8 +13,10 @@ public class NativeReminderPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private let center = UNUserNotificationCenter.current()
     private let managedPrefix = "mianleme_"
+    private let interviewSummaryCategory = "MianlemeInterviewSummary"
 
     @objc func requestReminderPermissions(_ call: CAPPluginCall) {
+        registerCategories()
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error {
                 call.reject(error.localizedDescription)
@@ -25,6 +27,7 @@ public class NativeReminderPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func sync(_ call: CAPPluginCall) {
+        registerCategories()
         guard let notifications = call.getArray("notifications", JSObject.self) else {
             call.reject("Invalid notifications")
             return
@@ -66,10 +69,43 @@ public class NativeReminderPlugin: CAPPlugin, CAPBridgedPlugin {
         content.title = title
         content.body = body
         content.sound = .default
+        if let category = raw["category"] as? String {
+            content.categoryIdentifier = category
+        }
+        content.userInfo = makeUserInfo(raw)
 
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         return UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+    }
+
+    private func registerCategories() {
+        let category = UNNotificationCategory(
+            identifier: interviewSummaryCategory,
+            actions: [],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+        center.setNotificationCategories([category])
+    }
+
+    private func makeUserInfo(_ raw: JSObject) -> [AnyHashable: Any] {
+        var userInfo: [AnyHashable: Any] = [:]
+        [
+            "company",
+            "role",
+            "stage",
+            "interviewDate",
+            "meetingId",
+            "platform",
+            "link",
+            "lang"
+        ].forEach { key in
+            if let value = raw[key] as? String, !value.isEmpty {
+                userInfo[key] = value
+            }
+        }
+        return userInfo
     }
 
     private func parseISODate(_ value: String) -> Date? {

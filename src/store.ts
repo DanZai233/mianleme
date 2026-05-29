@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AppState, FollowUpTemplates, Interview, InterviewPrepPack, InterviewStage, Language, PrepChecklistItem } from "./types";
+import { AppState, FollowUpTemplates, Interview, InterviewMarkdownDocument, InterviewPrepPack, InterviewStage, Language, PrepChecklistItem } from "./types";
 import { getBrowserTimezone } from "./utils";
 import { INTERVIEW_STAGE_VALUES } from "./interviewDefaults";
 
@@ -18,6 +18,8 @@ const defaultState: AppState = {
 function normalizeInterview(interview: Partial<Interview>): Interview {
   const result = typeof interview.result === "string" && INTERVIEW_RESULTS.has(interview.result) ? interview.result : "unknown";
   const stage = typeof interview.stage === "string" && INTERVIEW_STAGES.has(interview.stage as InterviewStage) ? interview.stage as InterviewStage : "applied";
+  const prepPack = normalizePrepPack(interview.prepPack);
+  const followUpTemplates = normalizeFollowUpTemplates(interview.followUpTemplates);
 
   return {
     id: String(interview.id || `${Date.now()}-${Math.random()}`),
@@ -32,14 +34,67 @@ function normalizeInterview(interview: Partial<Interview>): Interview {
     result: result as Interview["result"],
     stage,
     prepChecklist: normalizePrepChecklist(interview.prepChecklist),
-    prepPack: normalizePrepPack(interview.prepPack),
-    followUpTemplates: normalizeFollowUpTemplates(interview.followUpTemplates),
+    prepPack,
+    prepPackMarkdown: normalizeMarkdownDocument(interview.prepPackMarkdown) || prepPackToMarkdown(prepPack, interview),
+    followUpTemplates,
+    followUpTemplatesMarkdown: normalizeMarkdownDocument(interview.followUpTemplatesMarkdown) || followUpTemplatesToMarkdown(followUpTemplates, interview),
     followUpDate: String(interview.followUpDate || ""),
     followUpDone: Boolean(interview.followUpDone),
     status: interview.status || "upcoming",
     reminderHours: Number.isFinite(Number(interview.reminderHours)) ? Number(interview.reminderHours) : 1,
     durationMinutes: Number.isFinite(Number(interview.durationMinutes)) ? Number(interview.durationMinutes) : 60,
   };
+}
+
+function normalizeMarkdownDocument(value: unknown): InterviewMarkdownDocument | null {
+  if (!value || typeof value !== "object") return null;
+  const doc = value as Partial<InterviewMarkdownDocument>;
+  const content = String(doc.content || "");
+  if (!content.trim()) return null;
+  const generatedAt = String(doc.generatedAt || new Date().toISOString());
+  return {
+    generatedAt,
+    updatedAt: String(doc.updatedAt || generatedAt),
+    title: String(doc.title || "Interview document"),
+    content,
+  };
+}
+
+function prepPackToMarkdown(pack: InterviewPrepPack | null, interview: Partial<Interview>): InterviewMarkdownDocument | null {
+  if (!pack) return null;
+  const title = `${interview.company || interview.role || "Interview"} Prep Pack`;
+  const section = (heading: string, items: string[]) => items.length ? `\n## ${heading}\n${items.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n` : "";
+  const content = [
+    `# ${title}`,
+    section("5-minute brief", pack.quickBrief),
+    section("Likely questions", pack.possibleQuestions),
+    section("STAR stories", pack.starStories),
+    section("Questions to ask", pack.questionsToAsk),
+  ].join("\n").trim();
+  return content ? {
+    generatedAt: pack.generatedAt,
+    updatedAt: pack.generatedAt,
+    title,
+    content,
+  } : null;
+}
+
+function followUpTemplatesToMarkdown(templates: FollowUpTemplates | null, interview: Partial<Interview>): InterviewMarkdownDocument | null {
+  if (!templates) return null;
+  const title = `${interview.company || interview.role || "Interview"} Follow-up Templates`;
+  const blocks = [
+    ["Thank-you note", templates.thankYou],
+    ["Progress check", templates.progressCheck],
+    ["Addendum", templates.addendum],
+    ["English follow-up", templates.englishFollowUp],
+  ].filter(([, text]) => text);
+  const content = [`# ${title}`, ...blocks.map(([heading, text]) => `\n## ${heading}\n${text}`)].join("\n").trim();
+  return content ? {
+    generatedAt: templates.generatedAt,
+    updatedAt: templates.generatedAt,
+    title,
+    content,
+  } : null;
 }
 
 function normalizePrepChecklist(value: unknown): PrepChecklistItem[] {

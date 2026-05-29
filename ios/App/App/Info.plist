@@ -60,6 +60,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>面了么需要访问您的照片图库，以便您主动选择面试邀请截图并使用智能识别功能提取公司、岗位、时间、会议链接等信息。除您选择的图片外，应用不会读取其他照片。</string>
 	<key>NSCameraUsageDescription</key>

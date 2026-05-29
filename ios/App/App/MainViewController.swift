@@ -10,5 +10,6 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(NativeReminderPlugin())
         bridge?.registerPluginInstance(NativeWidgetPlugin())
         bridge?.registerPluginInstance(NativeSharePlugin())
+        bridge?.registerPluginInstance(NativeLiveActivityPlugin())
     }
 }

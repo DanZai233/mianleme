@@ -24,6 +24,13 @@ export interface FollowUpTemplates {
   englishFollowUp: string;
 }
 
+export interface InterviewMarkdownDocument {
+  generatedAt: string;
+  updatedAt: string;
+  title: string;
+  content: string;
+}
+
 export interface Interview {
   id: string;
   company: string;
@@ -38,7 +45,9 @@ export interface Interview {
   stage: InterviewStage;
   prepChecklist: PrepChecklistItem[];
   prepPack: InterviewPrepPack | null;
+  prepPackMarkdown: InterviewMarkdownDocument | null;
   followUpTemplates: FollowUpTemplates | null;
+  followUpTemplatesMarkdown: InterviewMarkdownDocument | null;
   followUpDate: string;
   followUpDone: boolean;
   status: InterviewStatus;

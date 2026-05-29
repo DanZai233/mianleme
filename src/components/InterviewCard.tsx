@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Interview, InterviewResult, InterviewStage, Language } from '../types';
 import { useI18n } from '../i18n';
 import { addToSystemCalendar, createGoogleCalendarUrl } from '../utils';
@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Clock,
   Copy,
+  Download,
   Edit2,
   ExternalLink,
   Hash,
@@ -17,6 +18,7 @@ import {
   Mail,
   MapPin,
   RefreshCw,
+  Save,
   Share,
   Sparkles,
   Trash2,
@@ -56,6 +58,43 @@ async function copyToClipboard(value: string) {
 
 function stopEvent(event: React.MouseEvent) {
   event.stopPropagation();
+}
+
+function slugifyFileName(value: string) {
+  return value
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '')
+    .replace(/\s+/g, '-')
+    .slice(0, 80) || 'interview-document';
+}
+
+async function downloadMarkdownFile(title: string, content: string) {
+  const filename = `${slugifyFileName(title)}.md`;
+  const file = new File([content], filename, { type: 'text/markdown;charset=utf-8' });
+  if (navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file], title });
+    return;
+  }
+
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function normalizeMarkdownResponse(data: any, fallbackTitle: string) {
+  const now = new Date().toISOString();
+  return {
+    generatedAt: String(data?.generatedAt || now),
+    updatedAt: String(data?.updatedAt || data?.generatedAt || now),
+    title: String(data?.title || fallbackTitle),
+    content: String(data?.content || '').trim(),
+  };
 }
 
 export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, onUpdate, onDelete, hasConflict = false }: Props) {
@@ -414,9 +453,13 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interview, lang, timezone }),
       });
-      if (!response.ok) throw new Error('Failed to generate prep pack');
-      const prepPack = await response.json();
-      onUpdate({ prepPack });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to generate prep pack');
+      }
+      const data = await response.json();
+      const prepPackMarkdown = normalizeMarkdownResponse(data, `${interview.company || interview.role || 'Interview'} Prep Pack`);
+      onUpdate({ prepPackMarkdown });
       toast.success(t.aiPrepPack);
     } catch (error: any) {
       toast.error(error?.message || t.calendarUnavailable);
@@ -433,9 +476,13 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interview, lang }),
       });
-      if (!response.ok) throw new Error('Failed to generate templates');
-      const followUpTemplates = await response.json();
-      onUpdate({ followUpTemplates });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to generate templates');
+      }
+      const data = await response.json();
+      const followUpTemplatesMarkdown = normalizeMarkdownResponse(data, `${interview.company || interview.role || 'Interview'} Follow-up Templates`);
+      onUpdate({ followUpTemplatesMarkdown });
       toast.success(t.followUpTemplates);
     } catch (error: any) {
       toast.error(error?.message || t.calendarUnavailable);
@@ -541,7 +588,7 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase text-violet-700 dark:text-violet-300">{t.aiPrepPack}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{interview.prepPack ? format(new Date(interview.prepPack.generatedAt), 'yyyy-MM-dd HH:mm') : t.generatePrepPack}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{interview.prepPackMarkdown ? format(new Date(interview.prepPackMarkdown.updatedAt), 'yyyy-MM-dd HH:mm') : t.generatePrepPack}</p>
               </div>
               <button
                 onClick={generatePrepPack}
@@ -549,16 +596,18 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
                 className="min-h-9 shrink-0 rounded-xl bg-violet-500 disabled:bg-violet-300 px-3 py-2 text-xs font-bold text-white flex items-center gap-1.5"
               >
                 {isGeneratingPrep ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                {isGeneratingPrep ? t.generating : interview.prepPack ? t.regeneratePrepPack : t.generatePrepPack}
+                {isGeneratingPrep ? t.generating : interview.prepPackMarkdown ? t.regeneratePrepPack : t.generatePrepPack}
               </button>
             </div>
-            {interview.prepPack && (
-              <div className="space-y-3">
-                <PrepPackSection title={t.quickBrief} items={interview.prepPack.quickBrief} />
-                <PrepPackSection title={t.possibleQuestions} items={interview.prepPack.possibleQuestions} />
-                <PrepPackSection title={t.starStories} items={interview.prepPack.starStories} />
-                <PrepPackSection title={t.questionsToAsk} items={interview.prepPack.questionsToAsk} />
-              </div>
+            {interview.prepPackMarkdown && (
+              <MarkdownDocumentPanel
+                document={interview.prepPackMarkdown}
+                documentType="prep"
+                interview={interview}
+                lang={lang}
+                timezone={timezone}
+                onSave={(document) => onUpdate({ prepPackMarkdown: document })}
+              />
             )}
           </div>
 
@@ -594,7 +643,7 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase text-cyan-700 dark:text-cyan-300">{t.followUpTemplates}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{interview.followUpTemplates ? format(new Date(interview.followUpTemplates.generatedAt), 'yyyy-MM-dd HH:mm') : t.generateFollowUpTemplates}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{interview.followUpTemplatesMarkdown ? format(new Date(interview.followUpTemplatesMarkdown.updatedAt), 'yyyy-MM-dd HH:mm') : t.generateFollowUpTemplates}</p>
               </div>
               <button
                 onClick={generateFollowUpTemplates}
@@ -605,13 +654,15 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
                 {isGeneratingTemplates ? t.generating : t.generateFollowUpTemplates}
               </button>
             </div>
-            {interview.followUpTemplates && (
-              <div className="space-y-2">
-                <TemplateBlock title={t.thankYouTemplate} text={interview.followUpTemplates.thankYou} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
-                <TemplateBlock title={t.progressCheckTemplate} text={interview.followUpTemplates.progressCheck} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
-                <TemplateBlock title={t.addendumTemplate} text={interview.followUpTemplates.addendum} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
-                <TemplateBlock title={t.englishFollowUpTemplate} text={interview.followUpTemplates.englishFollowUp} onCopy={copyTemplate} copyLabel={t.copyTemplate} />
-              </div>
+            {interview.followUpTemplatesMarkdown && (
+              <MarkdownDocumentPanel
+                document={interview.followUpTemplatesMarkdown}
+                documentType="followUp"
+                interview={interview}
+                lang={lang}
+                timezone={timezone}
+                onSave={(document) => onUpdate({ followUpTemplatesMarkdown: document })}
+              />
             )}
           </div>
 
@@ -650,6 +701,144 @@ function PrepPackSection({ title, items }: { title: string; items: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+type MarkdownDocument = NonNullable<Interview['prepPackMarkdown']>;
+
+function MarkdownDocumentPanel({
+  document,
+  documentType,
+  interview,
+  lang,
+  timezone,
+  onSave,
+}: {
+  document: MarkdownDocument;
+  documentType: 'prep' | 'followUp';
+  interview: Interview;
+  lang: Language;
+  timezone: string;
+  onSave: (document: MarkdownDocument) => void;
+}) {
+  const t = useI18n(lang);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(document.content);
+  const [aiMessage, setAiMessage] = useState('');
+  const [aiReply, setAiReply] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+
+  useEffect(() => {
+    setDraft(document.content);
+  }, [document.content]);
+
+  const saveDraft = () => {
+    onSave({ ...document, content: draft, updatedAt: new Date().toISOString() });
+    setIsEditing(false);
+    toast.success(t.documentSaved);
+  };
+
+  const copyDocument = async () => {
+    await copyToClipboard(document.content);
+    toast.success(t.documentCopied);
+  };
+
+  const downloadDocument = async () => {
+    try {
+      await downloadMarkdownFile(document.title, document.content);
+      toast.success(t.documentDownloaded);
+    } catch (error) {
+      toast.error(t.calendarUnavailable);
+    }
+  };
+
+  const askAi = async () => {
+    if (!aiMessage.trim()) return;
+    setIsChatting(true);
+    try {
+      const response = await fetch(apiUrl('/api/chat-document'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interview,
+          document,
+          documentType,
+          message: aiMessage,
+          lang,
+          timezone,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to update document');
+      }
+      const data = await response.json();
+      const nextDocument = normalizeMarkdownResponse(data.document, document.title);
+      onSave(nextDocument);
+      setDraft(nextDocument.content);
+      setAiReply(String(data.reply || ''));
+      setAiMessage('');
+    } catch (error: any) {
+      toast.error(error?.message || t.calendarUnavailable);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl bg-white/80 dark:bg-black/20 p-3">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button onClick={() => setIsEditing((value) => !value)} className="min-h-9 rounded-xl bg-gray-900 dark:bg-white px-3 py-2 text-xs font-bold text-white dark:text-black flex items-center gap-1.5">
+            <Edit2 size={14} /> {isEditing ? t.previewMarkdown : t.editMarkdown}
+          </button>
+          <button onClick={copyDocument} className="min-h-9 rounded-xl bg-white dark:bg-white/10 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
+            <Copy size={14} /> {t.copyMarkdown}
+          </button>
+          <button onClick={downloadDocument} className="min-h-9 rounded-xl bg-white dark:bg-white/10 px-3 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
+            <Download size={14} /> {t.downloadMarkdown}
+          </button>
+          {isEditing && (
+            <button onClick={saveDraft} className="min-h-9 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white flex items-center gap-1.5">
+              <Save size={14} /> {t.save}
+            </button>
+          )}
+        </div>
+
+        {isEditing ? (
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            className="min-h-[320px] w-full resize-y rounded-xl bg-white dark:bg-[#1C1C1E] p-3 font-mono text-[13px] leading-relaxed text-black dark:text-white outline-none focus:ring-2 focus:ring-violet-500/40"
+          />
+        ) : (
+          <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl bg-white dark:bg-[#1C1C1E] p-3 text-sm leading-relaxed text-gray-800 dark:text-gray-100">
+            {document.content}
+          </pre>
+        )}
+      </div>
+
+      <div className="rounded-xl bg-white/80 dark:bg-black/20 p-3">
+        <p className="mb-2 text-[11px] font-bold uppercase text-gray-500">{t.aiDocumentChat}</p>
+        <textarea
+          value={aiMessage}
+          onChange={(event) => setAiMessage(event.target.value)}
+          placeholder={t.aiDocumentPlaceholder}
+          className="mb-2 min-h-[84px] w-full resize-y rounded-xl bg-white dark:bg-[#1C1C1E] p-3 text-sm leading-relaxed text-black dark:text-white outline-none focus:ring-2 focus:ring-violet-500/40"
+        />
+        <button
+          onClick={askAi}
+          disabled={isChatting || !aiMessage.trim()}
+          className="min-h-9 rounded-xl bg-violet-500 disabled:bg-violet-300 px-3 py-2 text-xs font-bold text-white flex items-center gap-1.5"
+        >
+          {isChatting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {isChatting ? t.generating : t.askAi}
+        </button>
+        {aiReply && (
+          <p className="mt-3 whitespace-pre-wrap rounded-xl bg-violet-50 dark:bg-violet-500/10 p-3 text-sm leading-relaxed text-gray-700 dark:text-gray-200">{aiReply}</p>
+        )}
+      </div>
     </div>
   );
 }

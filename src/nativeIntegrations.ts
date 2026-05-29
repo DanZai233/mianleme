@@ -7,6 +7,15 @@ type NativeReminderPayload = {
   title: string;
   body: string;
   date: string;
+  category?: string;
+  company?: string;
+  role?: string;
+  stage?: string;
+  interviewDate?: string;
+  meetingId?: string;
+  platform?: string;
+  link?: string;
+  lang?: Language;
 };
 
 interface NativeReminderPlugin {
@@ -18,6 +27,23 @@ interface NativeWidgetPlugin {
   updateSnapshot(options: { snapshot: Record<string, unknown> }): Promise<void>;
 }
 
+type NativeLiveActivityPayload = {
+  interviewId: string;
+  company: string;
+  role: string;
+  stage: string;
+  interviewDate: string;
+  meetingId: string;
+  platform: string;
+  link: string;
+  lang: Language;
+};
+
+interface NativeLiveActivityPlugin {
+  sync(options: { activity?: NativeLiveActivityPayload }): Promise<{ active: boolean; reason?: string }>;
+  end(): Promise<{ ended: boolean }>;
+}
+
 interface NativeSharePlugin {
   getPendingShare(): Promise<{ text?: string; imageBase64?: string }>;
   clearPendingShare(): Promise<void>;
@@ -25,6 +51,7 @@ interface NativeSharePlugin {
 
 const NativeReminder = registerPlugin<NativeReminderPlugin>("NativeReminder");
 const NativeWidget = registerPlugin<NativeWidgetPlugin>("NativeWidget");
+const NativeLiveActivity = registerPlugin<NativeLiveActivityPlugin>("NativeLiveActivity");
 const NativeShare = registerPlugin<NativeSharePlugin>("NativeShare");
 
 export function isNativeApp() {
@@ -52,6 +79,15 @@ export async function syncNativeInterviewReminders(interviews: Interview[], lang
           title: lang === "zh" ? "面试快开始了" : "Interview coming up",
           body: `${interview.company} - ${interview.role}`,
           date: reminderAt.toISOString(),
+          category: "MianlemeInterviewSummary",
+          company: interview.company,
+          role: interview.role,
+          stage: interview.stage,
+          interviewDate: startDate.toISOString(),
+          meetingId: interview.meetingId,
+          platform: interview.platform,
+          link: interview.link,
+          lang,
         });
       }
     }
@@ -114,6 +150,42 @@ export async function syncWidgetSnapshot(interviews: Interview[], timezone: stri
   };
 
   await NativeWidget.updateSnapshot({ snapshot });
+}
+
+export async function syncLiveActivity(interviews: Interview[], timezone: string, lang: Language) {
+  if (!isNativeApp()) return;
+  const now = Date.now();
+  const next = interviews
+    .filter((interview) => interview.status === "upcoming" && interview.date)
+    .map((interview) => {
+      try {
+        const time = calendarDateFromString(interview.date, timezone).getTime();
+        return Number.isFinite(time) ? { interview, time } : null;
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is { interview: Interview; time: number } => Boolean(item) && item.time > now)
+    .sort((a, b) => a.time - b.time)[0];
+
+  if (!next) {
+    await NativeLiveActivity.end();
+    return;
+  }
+
+  await NativeLiveActivity.sync({
+    activity: {
+      interviewId: next.interview.id,
+      company: next.interview.company,
+      role: next.interview.role,
+      stage: next.interview.stage,
+      interviewDate: new Date(next.time).toISOString(),
+      meetingId: next.interview.meetingId,
+      platform: next.interview.platform,
+      link: next.interview.link,
+      lang,
+    },
+  });
 }
 
 export async function getPendingNativeShare() {

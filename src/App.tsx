@@ -14,6 +14,7 @@ import {
   getPendingNativeShare,
   isNativeApp,
   requestNativeReminderPermission,
+  syncLiveActivity,
   syncNativeInterviewReminders,
   syncWidgetSnapshot,
 } from './nativeIntegrations';
@@ -116,6 +117,9 @@ export default function App() {
     const syncWidgets = () => {
       syncWidgetSnapshot(state.interviews, state.timezone, state.language).catch((error) => {
         console.warn('Native widget sync failed', error);
+      });
+      syncLiveActivity(state.interviews, state.timezone, state.language).catch((error) => {
+        console.warn('Native live activity sync failed', error);
       });
     };
 

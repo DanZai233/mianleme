@@ -13,6 +13,18 @@
       "dest": "/api/handler.ts"
     },
     {
+      "src": "/api/generate-prep-pack",
+      "dest": "/api/handler.ts"
+    },
+    {
+      "src": "/api/generate-followup-message",
+      "dest": "/api/handler.ts"
+    },
+    {
+      "src": "/api/chat-document",
+      "dest": "/api/handler.ts"
+    },
+    {
       "src": "/api/calendar.ics",
       "dest": "/api/handler.ts"
     },

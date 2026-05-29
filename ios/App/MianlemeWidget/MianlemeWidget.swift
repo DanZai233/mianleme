@@ -104,7 +104,7 @@ private struct MianlemeWidgetView: View {
     }
 
     private var startDate: Date? {
-        ISO8601DateFormatter().date(from: entry.snapshot.date)
+        parseISODate(entry.snapshot.date)
     }
 
     private var isChinese: Bool {
@@ -402,7 +402,6 @@ private struct MianlemeWidgetView: View {
     }
 }
 
-@main
 struct MianlemeWidget: Widget {
     let kind = "MianlemeWidget"
 
@@ -413,6 +412,16 @@ struct MianlemeWidget: Widget {
         .configurationDisplayName("面了么")
         .description("显示下一场面试和倒计时信息。")
         .supportedFamilies(mianlemeSupportedFamilies)
+    }
+}
+
+@main
+struct MianlemeWidgetBundle: WidgetBundle {
+    var body: some Widget {
+        MianlemeWidget()
+        if #available(iOSApplicationExtension 16.1, *) {
+            MianlemeLiveActivity()
+        }
     }
 }
 
@@ -483,4 +492,14 @@ private extension Date {
     var iso8601String: String {
         ISO8601DateFormatter().string(from: self)
     }
+}
+
+private func parseISODate(_ value: String) -> Date? {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = formatter.date(from: value) {
+        return date
+    }
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter.date(from: value)
 }

@@ -17,9 +17,15 @@
 		7D3A222D2C5F4A9D00A10003 /* NativeWidgetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A222C2C5F4A9D00A10003 /* NativeWidgetPlugin.swift */; };
 		7D3A222F2C5F4A9D00A10004 /* NativeSharePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A222E2C5F4A9D00A10004 /* NativeSharePlugin.swift */; };
 		7D3A24012C5F4A9D00A10011 /* MianlemeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A24002C5F4A9D00A10011 /* MianlemeWidget.swift */; };
+		7D3A240B2C5F4A9D00A1001B /* MianlemeLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A240C2C5F4A9D00A1001B /* MianlemeLiveActivity.swift */; };
 		7D3A24032C5F4A9D00A10012 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A24022C5F4A9D00A10012 /* ShareViewController.swift */; };
 		7D3A24052C5F4A9D00A10013 /* MianlemeWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 7D3A24102C5F4A9D00A10013 /* MianlemeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7D3A24062C5F4A9D00A10014 /* MianlemeShare.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 7D3A24112C5F4A9D00A10014 /* MianlemeShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7D3A25012C5F4A9D00A10101 /* NotificationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A25002C5F4A9D00A10101 /* NotificationViewController.swift */; };
+		7D3A25052C5F4A9D00A10103 /* MianlemeNotification.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 7D3A25102C5F4A9D00A10103 /* MianlemeNotification.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7D3A26012C5F4A9D00A10201 /* MianlemeLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A26002C5F4A9D00A10201 /* MianlemeLiveActivityAttributes.swift */; };
+		7D3A26022C5F4A9D00A10202 /* MianlemeLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A26002C5F4A9D00A10201 /* MianlemeLiveActivityAttributes.swift */; };
+		7D3A26042C5F4A9D00A10204 /* NativeLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3A26032C5F4A9D00A10204 /* NativeLiveActivityPlugin.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -41,6 +47,13 @@
 			remoteGlobalIDString = 7D3A24312C5F4A9D00A10022;
 			remoteInfo = MianlemeShare;
 		};
+		7D3A25402C5F4A9D00A10131 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7D3A25302C5F4A9D00A10121;
+			remoteInfo = MianlemeNotification;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -52,6 +65,7 @@
 			files = (
 				7D3A24052C5F4A9D00A10013 /* MianlemeWidget.appex in Embed App Extensions */,
 				7D3A24062C5F4A9D00A10014 /* MianlemeShare.appex in Embed App Extensions */,
+				7D3A25052C5F4A9D00A10103 /* MianlemeNotification.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -70,6 +84,7 @@
 		7D3A222E2C5F4A9D00A10004 /* NativeSharePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSharePlugin.swift; sourceTree = "<group>"; };
 		7D3A22302C5F4A9D00A10005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		7D3A24002C5F4A9D00A10011 /* MianlemeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MianlemeWidget.swift; sourceTree = "<group>"; };
+		7D3A240C2C5F4A9D00A1001B /* MianlemeLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MianlemeLiveActivity.swift; sourceTree = "<group>"; };
 		7D3A24072C5F4A9D00A10015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		7D3A24082C5F4A9D00A10016 /* MianlemeWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MianlemeWidget.entitlements; sourceTree = "<group>"; };
 		7D3A24022C5F4A9D00A10012 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -77,6 +92,11 @@
 		7D3A240A2C5F4A9D00A10018 /* MianlemeShare.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MianlemeShare.entitlements; sourceTree = "<group>"; };
 		7D3A24102C5F4A9D00A10013 /* MianlemeWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MianlemeWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D3A24112C5F4A9D00A10014 /* MianlemeShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MianlemeShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7D3A25002C5F4A9D00A10101 /* NotificationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationViewController.swift; sourceTree = "<group>"; };
+		7D3A25072C5F4A9D00A10105 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7D3A25102C5F4A9D00A10103 /* MianlemeNotification.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MianlemeNotification.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7D3A26002C5F4A9D00A10201 /* MianlemeLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MianlemeLiveActivityAttributes.swift; sourceTree = "<group>"; };
+		7D3A26032C5F4A9D00A10204 /* NativeLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLiveActivityPlugin.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -108,6 +128,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7D3A25212C5F4A9D00A10123 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -118,6 +145,8 @@
 				504EC3061FED79650016851F /* App */,
 				7D3A24122C5F4A9D00A10019 /* MianlemeWidget */,
 				7D3A24132C5F4A9D00A1001A /* MianlemeShare */,
+				7D3A25122C5F4A9D00A10119 /* MianlemeNotification */,
+				7D3A26102C5F4A9D00A10210 /* MianlemeShared */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -128,6 +157,7 @@
 				504EC3041FED79650016851F /* App.app */,
 				7D3A24102C5F4A9D00A10013 /* MianlemeWidget.appex */,
 				7D3A24112C5F4A9D00A10014 /* MianlemeShare.appex */,
+				7D3A25102C5F4A9D00A10103 /* MianlemeNotification.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -143,6 +173,7 @@
 				7D3A222A2C5F4A9D00A10002 /* NativeReminderPlugin.swift */,
 				7D3A222C2C5F4A9D00A10003 /* NativeWidgetPlugin.swift */,
 				7D3A222E2C5F4A9D00A10004 /* NativeSharePlugin.swift */,
+				7D3A26032C5F4A9D00A10204 /* NativeLiveActivityPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -157,6 +188,7 @@
 			isa = PBXGroup;
 			children = (
 				7D3A24002C5F4A9D00A10011 /* MianlemeWidget.swift */,
+				7D3A240C2C5F4A9D00A1001B /* MianlemeLiveActivity.swift */,
 				7D3A24072C5F4A9D00A10015 /* Info.plist */,
 				7D3A24082C5F4A9D00A10016 /* MianlemeWidget.entitlements */,
 			);
@@ -171,6 +203,23 @@
 				7D3A240A2C5F4A9D00A10018 /* MianlemeShare.entitlements */,
 			);
 			path = MianlemeShare;
+			sourceTree = "<group>";
+		};
+		7D3A25122C5F4A9D00A10119 /* MianlemeNotification */ = {
+			isa = PBXGroup;
+			children = (
+				7D3A25002C5F4A9D00A10101 /* NotificationViewController.swift */,
+				7D3A25072C5F4A9D00A10105 /* Info.plist */,
+			);
+			path = MianlemeNotification;
+			sourceTree = "<group>";
+		};
+		7D3A26102C5F4A9D00A10210 /* MianlemeShared */ = {
+			isa = PBXGroup;
+			children = (
+				7D3A26002C5F4A9D00A10201 /* MianlemeLiveActivityAttributes.swift */,
+			);
+			path = MianlemeShared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -190,6 +239,7 @@
 			dependencies = (
 				7D3A24412C5F4A9D00A10033 /* PBXTargetDependency */,
 				7D3A24432C5F4A9D00A10034 /* PBXTargetDependency */,
+				7D3A25412C5F4A9D00A10133 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -233,6 +283,23 @@
 			productReference = 7D3A24112C5F4A9D00A10014 /* MianlemeShare.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		7D3A25302C5F4A9D00A10121 /* MianlemeNotification */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7D3A25502C5F4A9D00A10141 /* Build configuration list for PBXNativeTarget "MianlemeNotification" */;
+			buildPhases = (
+				7D3A25202C5F4A9D00A10122 /* Sources */,
+				7D3A25212C5F4A9D00A10123 /* Frameworks */,
+				7D3A25222C5F4A9D00A10124 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MianlemeNotification;
+			productName = MianlemeNotification;
+			productReference = 7D3A25102C5F4A9D00A10103 /* MianlemeNotification.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -252,6 +319,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					7D3A24312C5F4A9D00A10022 = {
+						CreatedOnToolsVersion = 17.0;
+						ProvisioningStyle = Automatic;
+					};
+					7D3A25302C5F4A9D00A10121 = {
 						CreatedOnToolsVersion = 17.0;
 						ProvisioningStyle = Automatic;
 					};
@@ -276,6 +347,7 @@
 				504EC3031FED79650016851F /* App */,
 				7D3A24302C5F4A9D00A10021 /* MianlemeWidget */,
 				7D3A24312C5F4A9D00A10022 /* MianlemeShare */,
+				7D3A25302C5F4A9D00A10121 /* MianlemeNotification */,
 			);
 		};
 /* End PBXProject section */
@@ -308,6 +380,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7D3A25222C5F4A9D00A10124 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -321,6 +400,8 @@
 				7D3A222B2C5F4A9D00A10002 /* NativeReminderPlugin.swift in Sources */,
 				7D3A222D2C5F4A9D00A10003 /* NativeWidgetPlugin.swift in Sources */,
 				7D3A222F2C5F4A9D00A10004 /* NativeSharePlugin.swift in Sources */,
+				7D3A26012C5F4A9D00A10201 /* MianlemeLiveActivityAttributes.swift in Sources */,
+				7D3A26042C5F4A9D00A10204 /* NativeLiveActivityPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,6 +410,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				7D3A24012C5F4A9D00A10011 /* MianlemeWidget.swift in Sources */,
+				7D3A240B2C5F4A9D00A1001B /* MianlemeLiveActivity.swift in Sources */,
+				7D3A26022C5F4A9D00A10202 /* MianlemeLiveActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -337,6 +420,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				7D3A24032C5F4A9D00A10012 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7D3A25202C5F4A9D00A10122 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7D3A25012C5F4A9D00A10101 /* NotificationViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -352,6 +443,11 @@
 			isa = PBXTargetDependency;
 			target = 7D3A24312C5F4A9D00A10022 /* MianlemeShare */;
 			targetProxy = 7D3A24422C5F4A9D00A10032 /* PBXContainerItemProxy */;
+		};
+		7D3A25412C5F4A9D00A10133 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7D3A25302C5F4A9D00A10121 /* MianlemeNotification */;
+			targetProxy = 7D3A25402C5F4A9D00A10131 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -618,6 +714,47 @@
 			};
 			name = Release;
 		};
+		7D3A25602C5F4A9D00A10151 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 9;
+				DEVELOPMENT_TEAM = H95389Z2AQ;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MianlemeNotification/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.danzai.mianleme.notification;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7D3A25612C5F4A9D00A10152 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 9;
+				DEVELOPMENT_TEAM = H95389Z2AQ;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MianlemeNotification/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.danzai.mianleme.notification;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -653,6 +790,15 @@
 			buildConfigurations = (
 				7D3A24622C5F4A9D00A10053 /* Debug */,
 				7D3A24632C5F4A9D00A10054 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7D3A25502C5F4A9D00A10141 /* Build configuration list for PBXNativeTarget "MianlemeNotification" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7D3A25602C5F4A9D00A10151 /* Debug */,
+				7D3A25612C5F4A9D00A10152 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
