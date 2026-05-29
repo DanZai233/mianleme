@@ -2,6 +2,7 @@ import Capacitor
 import EventKit
 import EventKitUI
 import Foundation
+import UIKit
 
 @objc(NativeCalendarPlugin)
 public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewDelegate {
@@ -15,52 +16,21 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
     private var pendingCall: CAPPluginCall?
 
     @objc func addEvent(_ call: CAPPluginCall) {
-        if #available(iOS 17.0, *) {
-            DispatchQueue.main.async { [weak self] in
-                self?.presentEventEditor(call)
-            }
-            return
-        }
-
-        requestCalendarAccess { [weak self] granted, error in
-            guard let self else { return }
-            if let error {
-                call.reject(error.localizedDescription)
-                return
-            }
-            guard granted else {
-                call.reject("calendar permission denied")
-                return
-            }
-
-            do {
-                let identifier = try self.saveEvent(call)
-                call.resolve(["eventIdentifier": identifier ?? ""])
-            } catch {
-                call.reject(error.localizedDescription)
-            }
+        DispatchQueue.main.async { [weak self] in
+            self?.presentEventEditor(call)
         }
     }
 
-    private func requestCalendarAccess(completion: @escaping (Bool, Error?) -> Void) {
-        if #available(iOS 17.0, *) {
-            eventStore.requestWriteOnlyAccessToEvents(completion: completion)
-        } else {
-            eventStore.requestAccess(to: .event, completion: completion)
-        }
-    }
-
-    @available(iOS 17.0, *)
     private func presentEventEditor(_ call: CAPPluginCall) {
         guard pendingCall == nil else {
-            call.reject("calendar editor already open")
+            call.reject("calendar-editor-already-open")
             return
         }
 
         do {
             let event = try buildEvent(call)
-            guard let presentingViewController = bridge?.viewController else {
-                call.reject("calendar presenter unavailable")
+            guard let presentingViewController = currentPresentingViewController() else {
+                call.reject("calendar-presenter-unavailable")
                 return
             }
 
@@ -76,16 +46,6 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
         }
     }
 
-    private func saveEvent(_ call: CAPPluginCall) throws -> String? {
-        let event = try buildEvent(call)
-        guard event.calendar != nil else {
-            throw CalendarPluginError.noDefaultCalendar
-        }
-
-        try eventStore.save(event, span: .thisEvent, commit: true)
-        return event.eventIdentifier
-    }
-
     private func buildEvent(_ call: CAPPluginCall) throws -> EKEvent {
         guard let title = call.getString("title"), !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw CalendarPluginError.invalidTitle
@@ -99,7 +59,9 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
         }
 
         let event = EKEvent(eventStore: eventStore)
-        event.calendar = eventStore.defaultCalendarForNewEvents
+        if let defaultCalendar = eventStore.defaultCalendarForNewEvents {
+            event.calendar = defaultCalendar
+        }
         event.title = title
         event.notes = call.getString("notes") ?? ""
         event.location = call.getString("location") ?? ""
@@ -116,6 +78,37 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
         }
 
         return event
+    }
+
+    private func currentPresentingViewController() -> UIViewController? {
+        if let bridgeViewController = bridge?.viewController {
+            return topViewController(from: bridgeViewController)
+        }
+
+        let foregroundScene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        let rootViewController = foregroundScene?.windows
+            .first { $0.isKeyWindow }?
+            .rootViewController
+
+        return topViewController(from: rootViewController)
+    }
+
+    private func topViewController(from viewController: UIViewController?) -> UIViewController? {
+        if let navigationController = viewController as? UINavigationController {
+            return topViewController(from: navigationController.visibleViewController)
+        }
+
+        if let tabBarController = viewController as? UITabBarController {
+            return topViewController(from: tabBarController.selectedViewController)
+        }
+
+        if let presentedViewController = viewController?.presentedViewController {
+            return topViewController(from: presentedViewController)
+        }
+
+        return viewController
     }
 
     private func parseISODate(_ value: String) -> Date? {
@@ -155,16 +148,13 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
 private enum CalendarPluginError: LocalizedError {
     case invalidTitle
     case invalidDate
-    case noDefaultCalendar
 
     var errorDescription: String? {
         switch self {
         case .invalidTitle:
-            return "Invalid event title"
+            return "calendar-invalid-title"
         case .invalidDate:
-            return "Invalid event date"
-        case .noDefaultCalendar:
-            return "No default calendar is available"
+            return "calendar-invalid-date"
         }
     }
 }

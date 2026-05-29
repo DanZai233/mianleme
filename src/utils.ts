@@ -108,8 +108,12 @@ export async function addToSystemCalendar(event: CalendarEventInput): Promise<Ca
       return "native";
     } catch (error: any) {
       const message = String(error?.message || error || "");
+      console.warn("Native calendar add failed", message);
       if (message.includes("permission") || message.includes("denied")) {
         throw new Error("calendar-permission-denied");
+      }
+      if (message.includes("invalid-date")) {
+        throw new Error("invalid-calendar-date");
       }
       throw new Error("calendar-unavailable");
     }
