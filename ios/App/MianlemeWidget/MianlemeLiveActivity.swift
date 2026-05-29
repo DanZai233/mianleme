@@ -26,7 +26,7 @@ struct MianlemeLiveActivity: Widget {
 
                 DynamicIslandExpandedRegion(.trailing) {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(liveActivityCountdownText(context.state.interviewDate, lang: context.state.lang))
+                        liveActivityCountdownView(context.state.interviewDate, lang: context.state.lang)
                             .font(.headline.weight(.bold))
                             .lineLimit(1)
                         Text(liveActivityShortDateText(context.state.interviewDate, lang: context.state.lang))
@@ -52,7 +52,7 @@ struct MianlemeLiveActivity: Widget {
                     .font(.caption.weight(.bold))
                     .minimumScaleFactor(0.7)
             } compactTrailing: {
-                Text(liveActivityCompactCountdownText(context.state.interviewDate))
+                liveActivityCompactCountdownView(context.state.interviewDate)
                     .font(.caption2.weight(.bold))
                     .minimumScaleFactor(0.7)
             } minimal: {
@@ -98,7 +98,7 @@ private struct MianlemeLiveActivityLockScreenView: View {
                 Spacer(minLength: 8)
 
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(liveActivityCountdownText(state.interviewDate, lang: state.lang))
+                    liveActivityCountdownView(state.interviewDate, lang: state.lang)
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(red: 0.60, green: 0.76, blue: 1.0))
                         .lineLimit(1)
@@ -191,6 +191,20 @@ private func liveActivityCountdownText(_ value: String, lang: String) -> String 
     return lang == "zh" ? "\(days) 天后" : "in \(days)d"
 }
 
+private func liveActivityCountdownView(_ value: String, lang: String) -> Text {
+    guard let date = liveActivityDate(value) else {
+        return Text(lang == "zh" ? "待确认" : "Pending")
+    }
+    let seconds = Int(date.timeIntervalSince(Date()))
+    if seconds < -60 {
+        return Text(lang == "zh" ? "待更新" : "Update")
+    }
+    if seconds < 60 {
+        return Text(lang == "zh" ? "马上开始" : "Soon")
+    }
+    return Text(date, style: .timer)
+}
+
 private func liveActivityCompactCountdownText(_ value: String) -> String {
     guard let date = liveActivityDate(value) else { return "?" }
     let seconds = Int(date.timeIntervalSince(Date()))
@@ -198,6 +212,14 @@ private func liveActivityCompactCountdownText(_ value: String) -> String {
     if seconds < 3600 { return "\(max(1, seconds / 60))m" }
     if seconds < 86400 { return "\(seconds / 3600)h" }
     return "\(seconds / 86400)d"
+}
+
+private func liveActivityCompactCountdownView(_ value: String) -> Text {
+    guard let date = liveActivityDate(value) else { return Text("?") }
+    let seconds = Int(date.timeIntervalSince(Date()))
+    if seconds < 60 { return Text("now") }
+    if seconds < 3600 { return Text(date, style: .timer) }
+    return Text(liveActivityCompactCountdownText(value))
 }
 
 private func liveActivityStageText(_ value: String, lang: String) -> String {

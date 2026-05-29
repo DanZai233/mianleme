@@ -1,41 +1,23 @@
 import SwiftUI
 import WidgetKit
 
-private struct InterviewSnapshot: Decodable {
-    let hasInterview: Bool
+private struct WidgetInterviewItem: Decodable {
     let company: String
     let role: String
     let stage: String
     let date: String
+    let timestamp: Double
     let meetingId: String
     let lang: String
 
     enum CodingKeys: String, CodingKey {
-        case hasInterview
         case company
         case role
         case stage
         case date
+        case timestamp
         case meetingId
         case lang
-    }
-
-    init(
-        hasInterview: Bool,
-        company: String,
-        role: String,
-        stage: String,
-        date: String,
-        meetingId: String,
-        lang: String
-    ) {
-        self.hasInterview = hasInterview
-        self.company = company
-        self.role = role
-        self.stage = stage
-        self.date = date
-        self.meetingId = meetingId
-        self.lang = lang
     }
 
     init(from decoder: Decoder) throws {
@@ -44,9 +26,116 @@ private struct InterviewSnapshot: Decodable {
         role = try container.decodeIfPresent(String.self, forKey: .role) ?? ""
         stage = try container.decodeIfPresent(String.self, forKey: .stage) ?? ""
         date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
+        timestamp = try container.decodeIfPresent(Double.self, forKey: .timestamp) ?? 0
+        meetingId = try container.decodeIfPresent(String.self, forKey: .meetingId) ?? ""
+        lang = try container.decodeIfPresent(String.self, forKey: .lang) ?? ""
+    }
+
+    var startDate: Date? {
+        dateFromSnapshotValues(date: date, timestamp: timestamp)
+    }
+}
+
+private struct InterviewSnapshot: Decodable {
+    let hasInterview: Bool
+    let company: String
+    let role: String
+    let stage: String
+    let date: String
+    let timestamp: Double
+    let meetingId: String
+    let lang: String
+    let items: [WidgetInterviewItem]
+
+    enum CodingKeys: String, CodingKey {
+        case hasInterview
+        case company
+        case role
+        case stage
+        case date
+        case timestamp
+        case meetingId
+        case lang
+        case items
+    }
+
+    init(
+        hasInterview: Bool,
+        company: String,
+        role: String,
+        stage: String,
+        date: String,
+        timestamp: Double,
+        meetingId: String,
+        lang: String,
+        items: [WidgetInterviewItem] = []
+    ) {
+        self.hasInterview = hasInterview
+        self.company = company
+        self.role = role
+        self.stage = stage
+        self.date = date
+        self.timestamp = timestamp
+        self.meetingId = meetingId
+        self.lang = lang
+        self.items = items
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        company = try container.decodeIfPresent(String.self, forKey: .company) ?? ""
+        role = try container.decodeIfPresent(String.self, forKey: .role) ?? ""
+        stage = try container.decodeIfPresent(String.self, forKey: .stage) ?? ""
+        date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
+        timestamp = try container.decodeIfPresent(Double.self, forKey: .timestamp) ?? 0
         meetingId = try container.decodeIfPresent(String.self, forKey: .meetingId) ?? ""
         lang = try container.decodeIfPresent(String.self, forKey: .lang) ?? "zh"
+        items = try container.decodeIfPresent([WidgetInterviewItem].self, forKey: .items) ?? []
         hasInterview = try container.decodeIfPresent(Bool.self, forKey: .hasInterview) ?? (!company.isEmpty || !date.isEmpty)
+    }
+
+    var startDate: Date? {
+        dateFromSnapshotValues(date: date, timestamp: timestamp)
+    }
+
+    func effectiveSnapshot(at referenceDate: Date) -> InterviewSnapshot {
+        guard !items.isEmpty else { return self }
+
+        let nextItem = items
+            .compactMap { item -> (WidgetInterviewItem, Date)? in
+                guard let startDate = item.startDate else { return nil }
+                return (item, startDate)
+            }
+            .filter { _, startDate in startDate > referenceDate.addingTimeInterval(-60) }
+            .sorted { $0.1 < $1.1 }
+            .first
+
+        guard let nextItem else {
+            return InterviewSnapshot(
+                hasInterview: false,
+                company: "",
+                role: lang == "zh" ? "暂无待进行面试" : "No upcoming interviews",
+                stage: "",
+                date: "",
+                timestamp: 0,
+                meetingId: "",
+                lang: lang,
+                items: items
+            )
+        }
+
+        let item = nextItem.0
+        return InterviewSnapshot(
+            hasInterview: true,
+            company: item.company,
+            role: item.role,
+            stage: item.stage,
+            date: item.date,
+            timestamp: item.timestamp,
+            meetingId: item.meetingId,
+            lang: item.lang.isEmpty ? lang : item.lang,
+            items: items
+        )
     }
 }
 
@@ -68,6 +157,7 @@ private struct Provider: TimelineProvider {
                 role: "前端工程师",
                 stage: "technical1",
                 date: Date().addingTimeInterval(3600).iso8601String,
+                timestamp: Date().addingTimeInterval(3600).timeIntervalSince1970 * 1000,
                 meetingId: "123 456 789",
                 lang: "zh"
             )
@@ -75,13 +165,19 @@ private struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (InterviewEntry) -> Void) {
-        completion(InterviewEntry(date: Date(), snapshot: loadSnapshot()))
+        let now = Date()
+        completion(InterviewEntry(date: now, snapshot: loadSnapshot().effectiveSnapshot(at: now)))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<InterviewEntry>) -> Void) {
-        let entry = InterviewEntry(date: Date(), snapshot: loadSnapshot())
-        let nextRefresh = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date().addingTimeInterval(1800)
-        completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
+        let now = Date()
+        let storedSnapshot = loadSnapshot()
+        let entryDates = timelineEntryDates(for: storedSnapshot, from: now)
+        let entries = entryDates.map { date in
+            InterviewEntry(date: date, snapshot: storedSnapshot.effectiveSnapshot(at: date))
+        }
+        let nextRefresh = (entryDates.last ?? now).addingTimeInterval(60)
+        completion(Timeline(entries: entries, policy: .after(nextRefresh)))
     }
 
     private func loadSnapshot() -> InterviewSnapshot {
@@ -90,7 +186,40 @@ private struct Provider: TimelineProvider {
            let snapshot = try? JSONDecoder().decode(InterviewSnapshot.self, from: data) {
             return snapshot
         }
-        return InterviewSnapshot(hasInterview: false, company: "", role: "暂无待进行面试", stage: "", date: "", meetingId: "", lang: "zh")
+        return InterviewSnapshot(hasInterview: false, company: "", role: "暂无待进行面试", stage: "", date: "", timestamp: 0, meetingId: "", lang: "zh")
+    }
+
+    private func timelineEntryDates(for storedSnapshot: InterviewSnapshot, from now: Date) -> [Date] {
+        let currentSnapshot = storedSnapshot.effectiveSnapshot(at: now)
+        guard currentSnapshot.hasInterview, let startDate = currentSnapshot.startDate, startDate > now else {
+            return [now]
+        }
+
+        var dates = [now]
+        var cursor = nextTimelineDate(after: now, startDate: startDate)
+        let horizon = min(startDate.addingTimeInterval(90), now.addingTimeInterval(6 * 60 * 60))
+
+        while cursor <= horizon && dates.count < 48 {
+            dates.append(cursor)
+            cursor = nextTimelineDate(after: cursor, startDate: startDate)
+        }
+
+        return dates
+    }
+
+    private func nextTimelineDate(after date: Date, startDate: Date) -> Date {
+        let remaining = startDate.timeIntervalSince(date)
+        let step: TimeInterval
+        if remaining <= 60 * 60 {
+            step = 60
+        } else if remaining <= 6 * 60 * 60 {
+            step = 5 * 60
+        } else if remaining <= 24 * 60 * 60 {
+            step = 15 * 60
+        } else {
+            step = 60 * 60
+        }
+        return date.addingTimeInterval(step)
     }
 }
 
@@ -104,7 +233,7 @@ private struct MianlemeWidgetView: View {
     }
 
     private var startDate: Date? {
-        parseISODate(entry.snapshot.date)
+        entry.snapshot.startDate
     }
 
     private var isChinese: Bool {
@@ -156,7 +285,7 @@ private struct MianlemeWidgetView: View {
 
     private var compactCountdownText: String {
         guard let date = startDate else { return isChinese ? "待" : "TBD" }
-        let seconds = Int(date.timeIntervalSince(Date()))
+        let seconds = Int(date.timeIntervalSince(entry.date))
         if seconds < -60 { return isChinese ? "更" : "UPD" }
         if seconds < 3600 { return "\(max(1, seconds / 60))m" }
         if seconds < 86400 { return "\(seconds / 3600)h" }
@@ -256,7 +385,7 @@ private struct MianlemeWidgetView: View {
             Spacer(minLength: 4)
 
             if !isEmpty {
-                glassTag(countdownText, prominent: true)
+                countdownGlassTag(prominent: true)
             }
         }
     }
@@ -296,7 +425,7 @@ private struct MianlemeWidgetView: View {
                 Spacer(minLength: 8)
 
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(countdownText)
+                    countdownValueText
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
                         .foregroundStyle(accentColor)
                         .lineLimit(1)
@@ -320,6 +449,34 @@ private struct MianlemeWidgetView: View {
                 Spacer(minLength: 0)
             }
         }
+    }
+
+    private var countdownValueText: Text {
+        guard let date = startDate else {
+            return Text(isChinese ? "待确认" : "Pending")
+        }
+        let seconds = Int(date.timeIntervalSince(entry.date))
+        if seconds < -60 {
+            return Text(isChinese ? "待更新" : "Update")
+        }
+        if seconds < 60 {
+            return Text(isChinese ? "马上开始" : "Soon")
+        }
+        return Text(date, style: .timer)
+    }
+
+    private func countdownGlassTag(prominent: Bool = false) -> some View {
+        HStack(spacing: 4) {
+            countdownValueText
+                .font(.system(size: prominent ? 11 : 12, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .foregroundStyle(prominent ? accentColor : secondaryTextColor)
+        .padding(.horizontal, prominent ? 8 : 9)
+        .padding(.vertical, prominent ? 4 : 5)
+        .background(chipFillColor, in: Capsule())
+        .overlay(Capsule().strokeBorder(chipStrokeColor, lineWidth: 0.8))
     }
 
     private var emptyHomeContent: some View {
@@ -492,6 +649,14 @@ private extension Date {
     var iso8601String: String {
         ISO8601DateFormatter().string(from: self)
     }
+}
+
+private func dateFromSnapshotValues(date: String, timestamp: Double) -> Date? {
+    if timestamp > 0 {
+        let seconds = timestamp > 10_000_000_000 ? timestamp / 1000 : timestamp
+        return Date(timeIntervalSince1970: seconds)
+    }
+    return parseISODate(date)
 }
 
 private func parseISODate(_ value: String) -> Date? {

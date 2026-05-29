@@ -28,6 +28,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { apiUrl } from '../api';
 import { createPrepChecklist } from '../interviewDefaults';
+import { ensureAiServiceConsent } from '../aiConsent';
 
 interface Props {
   interview: Interview;
@@ -446,6 +447,10 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
   };
 
   const generatePrepPack = async () => {
+    if (!ensureAiServiceConsent(lang)) {
+      toast.error(t.aiConsentRequired);
+      return;
+    }
     setIsGeneratingPrep(true);
     try {
       const response = await fetch(apiUrl('/api/generate-prep-pack'), {
@@ -469,6 +474,10 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
   };
 
   const generateFollowUpTemplates = async () => {
+    if (!ensureAiServiceConsent(lang)) {
+      toast.error(t.aiConsentRequired);
+      return;
+    }
     setIsGeneratingTemplates(true);
     try {
       const response = await fetch(apiUrl('/api/generate-followup-message'), {
@@ -755,6 +764,10 @@ function MarkdownDocumentPanel({
 
   const askAi = async () => {
     if (!aiMessage.trim()) return;
+    if (!ensureAiServiceConsent(lang)) {
+      toast.error(t.aiConsentRequired);
+      return;
+    }
     setIsChatting(true);
     try {
       const response = await fetch(apiUrl('/api/chat-document'), {

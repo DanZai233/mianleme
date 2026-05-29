@@ -130,6 +130,19 @@ export async function syncWidgetSnapshot(interviews: Interview[], timezone: stri
     .sort((a, b) => Math.abs(a.time - now) - Math.abs(b.time - now))[0];
   const fallbackPending = candidates[0];
   const upcoming = future || nearestPending || fallbackPending;
+  const futureItems = candidates
+    .filter(({ hasValidDate, time }) => hasValidDate && time > now)
+    .sort((a, b) => a.time - b.time)
+    .slice(0, 12)
+    .map(({ interview, time }) => ({
+      company: interview.company,
+      role: interview.role,
+      stage: interview.stage,
+      date: new Date(time).toISOString(),
+      timestamp: time,
+      meetingId: interview.meetingId,
+      lang,
+    }));
 
   const snapshot = upcoming ? {
     hasInterview: true,
@@ -137,16 +150,22 @@ export async function syncWidgetSnapshot(interviews: Interview[], timezone: stri
     role: upcoming.interview.role,
     stage: upcoming.interview.stage,
     date: upcoming.hasValidDate ? new Date(upcoming.time).toISOString() : "",
+    timestamp: upcoming.hasValidDate ? upcoming.time : 0,
     meetingId: upcoming.interview.meetingId,
     lang,
+    items: futureItems,
+    updatedAt: new Date(now).toISOString(),
   } : {
     hasInterview: false,
     company: "",
     role: lang === "zh" ? "暂无待进行面试" : "No upcoming interviews",
     stage: "",
     date: "",
+    timestamp: 0,
     meetingId: "",
     lang,
+    items: [],
+    updatedAt: new Date(now).toISOString(),
   };
 
   await NativeWidget.updateSnapshot({ snapshot });

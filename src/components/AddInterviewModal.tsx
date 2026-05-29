@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { formatDateTimeForTimezone, normalizeExtractedDate } from '../utils';
 import { apiUrl } from '../api';
 import { createPrepChecklist, INTERVIEW_STAGE_VALUES } from '../interviewDefaults';
+import { hasAiServiceConsent, setAiServiceConsent } from '../aiConsent';
 
 interface Props {
   initialData?: Interview | null;
@@ -67,8 +68,11 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
   
   const [extractMode, setExtractMode] = useState(false);
   const [extractText, setExtractText] = useState(initialExtractText);
+  const [pendingImageBase64, setPendingImageBase64] = useState(initialImageBase64);
+  const [aiSharingConsent, setAiSharingConsent] = useState(hasAiServiceConsent);
   const [isExtracting, setIsExtracting] = useState(false);
   const [shareExtractStarted, setShareExtractStarted] = useState(false);
+  const hasExtractPayload = Boolean(extractText.trim() || pendingImageBase64);
 
   // Focus lock effect avoiding background jumps
   useEffect(() => {
@@ -95,12 +99,20 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
   };
 
   const handleExtract = async (text: string, imageBase64?: string) => {
+    const normalizedText = text.trim();
+    const imagePayload = imageBase64 || undefined;
+    if (!normalizedText && !imagePayload) return;
+    if (!aiSharingConsent) {
+      toast.error(t.aiConsentRequired);
+      return;
+    }
+
     setIsExtracting(true);
     try {
       const res = await fetch(apiUrl('/api/parse-interview'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, imageBase64, timezone })
+        body: JSON.stringify({ text: normalizedText, imageBase64: imagePayload, timezone })
       });
       if (!res.ok) {
         const errorBody = await res.json().catch(() => null);
@@ -124,6 +136,7 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
         durationMinutes: data.durationMinutes || prev.durationMinutes,
       }));
       toast.success(t.extractedSuccess);
+      setPendingImageBase64('');
       setExtractMode(false);
     } catch (err: any) {
       if (err.message === 'Quota Exceeded') {
@@ -141,17 +154,31 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
     setShareExtractStarted(true);
     setExtractMode(true);
     if (initialExtractText) setExtractText(initialExtractText);
-    handleExtract(initialExtractText, initialImageBase64);
+    if (initialImageBase64) setPendingImageBase64(initialImageBase64);
+    toast.success(t.shareImportReady);
   }, [initialData, initialExtractText, initialImageBase64, shareExtractStarted]);
 
   const onImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!aiSharingConsent) {
+      toast.error(t.aiConsentRequired);
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
-      handleExtract('', ev.target?.result as string);
+      const imageBase64 = ev.target?.result as string;
+      setPendingImageBase64(imageBase64);
+      handleExtract('', imageBase64);
+      e.target.value = '';
     };
     reader.readAsDataURL(file);
+  };
+
+  const updateAiSharingConsent = (accepted: boolean) => {
+    setAiSharingConsent(accepted);
+    setAiServiceConsent(accepted);
   };
 
   return (
@@ -199,6 +226,28 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
 
           {extractMode && (
             <div className="bg-[#F2F2F7] dark:bg-black p-4 rounded-2xl border border-blue-200/50 dark:border-blue-500/20 space-y-3 animate-fade-in-native">
+              <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-blue-100 dark:border-blue-500/20 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <Sparkles size={15} />
+                  <p className="text-sm font-semibold">{t.aiConsentTitle}</p>
+                </div>
+                <p className="text-xs leading-5 text-gray-600 dark:text-gray-300">{t.aiConsentDescription}</p>
+                <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">{t.aiConsentProvider}</p>
+                <label className="flex items-start gap-2 text-xs leading-5 text-gray-700 dark:text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={aiSharingConsent}
+                    onChange={e => updateAiSharingConsent(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>{t.aiConsentCheckbox}</span>
+                </label>
+              </div>
+              {pendingImageBase64 && (
+                <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 px-3 py-2 rounded-xl">
+                  {t.aiImageReady}
+                </div>
+              )}
               <textarea 
                 className="w-full bg-white dark:bg-[#1C1C1E] text-sm p-3 rounded-xl border border-transparent focus:border-blue-400 outline-none dark:text-white h-24 resize-none shadow-sm dark:shadow-none"
                 placeholder={t.extractPlaceholder}
@@ -207,8 +256,8 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
               />
               <div className="flex gap-2">
                 <button 
-                  disabled={isExtracting || !extractText.trim()}
-                  onClick={() => handleExtract(extractText)}
+                  disabled={isExtracting || !hasExtractPayload || !aiSharingConsent}
+                  onClick={() => handleExtract(extractText, pendingImageBase64)}
                   className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-300 text-white py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm"
                 >
                   {isExtracting ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
@@ -216,9 +265,10 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
                 </button>
                 <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={onImageUpload} />
                 <button 
-                  disabled={isExtracting}
+                  disabled={isExtracting || !aiSharingConsent}
                   onClick={() => fileInputRef.current?.click()}
                   className="w-12 bg-white dark:bg-[#1C1C1E] disabled:opacity-50 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center border border-gray-200 dark:border-white/10 shadow-sm"
+                  title={t.extractFromImage}
                 >
                   <ImageIcon size={18} />
                 </button>
