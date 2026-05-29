@@ -75,23 +75,36 @@ export async function syncNativeInterviewReminders(interviews: Interview[], lang
 export async function syncWidgetSnapshot(interviews: Interview[], timezone: string, lang: Language) {
   if (!isNativeApp()) return;
   const now = Date.now();
-  const upcoming = interviews
-    .filter((interview) => interview.status === "upcoming" && interview.date)
-    .map((interview) => ({
-      interview,
-      time: calendarDateFromString(interview.date, timezone).getTime(),
-    }))
-    .filter(({ time }) => time > now)
+  const candidates = interviews
+    .filter((interview) => interview.status === "upcoming")
+    .map((interview) => {
+      try {
+        const time = interview.date ? calendarDateFromString(interview.date, timezone).getTime() : NaN;
+        return Number.isFinite(time) ? { interview, time, hasValidDate: true } : { interview, time: Number.POSITIVE_INFINITY, hasValidDate: false };
+      } catch {
+        return { interview, time: Number.POSITIVE_INFINITY, hasValidDate: false };
+      }
+    });
+
+  const future = candidates
+    .filter(({ hasValidDate, time }) => hasValidDate && time > now)
     .sort((a, b) => a.time - b.time)[0];
+  const nearestPending = candidates
+    .filter(({ hasValidDate }) => hasValidDate)
+    .sort((a, b) => Math.abs(a.time - now) - Math.abs(b.time - now))[0];
+  const fallbackPending = candidates[0];
+  const upcoming = future || nearestPending || fallbackPending;
 
   const snapshot = upcoming ? {
+    hasInterview: true,
     company: upcoming.interview.company,
     role: upcoming.interview.role,
     stage: upcoming.interview.stage,
-    date: new Date(upcoming.time).toISOString(),
+    date: upcoming.hasValidDate ? new Date(upcoming.time).toISOString() : "",
     meetingId: upcoming.interview.meetingId,
     lang,
   } : {
+    hasInterview: false,
     company: "",
     role: lang === "zh" ? "暂无待进行面试" : "No upcoming interviews",
     stage: "",
