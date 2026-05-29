@@ -96,6 +96,7 @@ private struct Provider: TimelineProvider {
 
 private struct MianlemeWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
     let entry: Provider.Entry
 
     private var isEmpty: Bool {
@@ -183,6 +184,30 @@ private struct MianlemeWidgetView: View {
         }
     }
 
+    private var isDarkMode: Bool {
+        colorScheme == .dark
+    }
+
+    private var primaryTextColor: Color {
+        isDarkMode ? Color(red: 0.94, green: 0.95, blue: 0.97) : Color(red: 0.08, green: 0.09, blue: 0.11)
+    }
+
+    private var secondaryTextColor: Color {
+        isDarkMode ? Color(red: 0.68, green: 0.71, blue: 0.76) : Color(red: 0.38, green: 0.42, blue: 0.48)
+    }
+
+    private var accentColor: Color {
+        isDarkMode ? Color(red: 0.54, green: 0.73, blue: 1.0) : Color(red: 0.12, green: 0.37, blue: 0.76)
+    }
+
+    private var chipFillColor: Color {
+        isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.58)
+    }
+
+    private var chipStrokeColor: Color {
+        isDarkMode ? Color.white.opacity(0.10) : Color.white.opacity(0.70)
+    }
+
     var body: some View {
         if #available(iOSApplicationExtension 16.0, *), family == .accessoryRectangular {
             lockScreenRectangular
@@ -196,22 +221,8 @@ private struct MianlemeWidgetView: View {
     }
 
     private var homeWidget: some View {
-        VStack(alignment: .leading, spacing: family == .systemMedium ? 12 : 9) {
-            HStack(spacing: 8) {
-                Text("面了么")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.08, green: 0.22, blue: 0.36))
-                Spacer(minLength: 4)
-                if !isEmpty {
-                    Text(countdownText)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.05, green: 0.35, blue: 0.26))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(red: 0.80, green: 0.95, blue: 0.88), in: Capsule())
-                        .lineLimit(1)
-                }
-            }
+        VStack(alignment: .leading, spacing: family == .systemMedium ? 14 : 10) {
+            widgetHeader
 
             if isEmpty {
                 emptyHomeContent
@@ -221,61 +232,92 @@ private struct MianlemeWidgetView: View {
                 smallHomeContent
             }
         }
-        .padding(family == .systemMedium ? 16 : 14)
+        .padding(family == .systemMedium ? 17 : 15)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .mianlemeWidgetBackground()
     }
 
+    private var widgetHeader: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(accentColor.opacity(isDarkMode ? 0.20 : 0.12))
+                Image(systemName: "calendar")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(accentColor)
+            }
+            .frame(width: 22, height: 22)
+
+            Text("面了么")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(secondaryTextColor)
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
+
+            if !isEmpty {
+                glassTag(countdownText, prominent: true)
+            }
+        }
+    }
+
     private var smallHomeContent: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             Spacer(minLength: 0)
             Text(entry.snapshot.company)
-                .font(.system(size: 20, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color(red: 0.06, green: 0.08, blue: 0.12))
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .foregroundStyle(primaryTextColor)
                 .lineLimit(2)
-                .minimumScaleFactor(0.78)
+                .minimumScaleFactor(0.76)
             Text(entry.snapshot.role)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(red: 0.34, green: 0.39, blue: 0.46))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(secondaryTextColor)
                 .lineLimit(2)
-            HStack(spacing: 6) {
-                Text(dateText)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(Color(red: 0.95, green: 0.47, blue: 0.19))
+            Spacer(minLength: 2)
+            glassTag(dateText, systemImage: "clock")
         }
     }
 
     private var mediumHomeContent: some View {
-        HStack(alignment: .bottom, spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(entry.snapshot.company)
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color(red: 0.06, green: 0.08, blue: 0.12))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Text(entry.snapshot.role)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.34, green: 0.39, blue: 0.46))
-                    .lineLimit(1)
-                HStack(spacing: 6) {
-                    tag(dateText, foreground: Color(red: 0.05, green: 0.31, blue: 0.54), background: Color(red: 0.84, green: 0.93, blue: 1.0))
-                    tag(stageText, foreground: Color(red: 0.44, green: 0.29, blue: 0.06), background: Color(red: 1.0, green: 0.91, blue: 0.68))
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .bottom, spacing: 16) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(entry.snapshot.company)
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryTextColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Text(entry.snapshot.role)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(secondaryTextColor)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(countdownText)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundStyle(accentColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
+                    Text(dateText)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(secondaryTextColor)
+                        .lineLimit(1)
                 }
             }
-            Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 7) {
-                Text(isChinese ? "会议号" : "Meeting")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.45, green: 0.50, blue: 0.57))
-                Text(entry.snapshot.meetingId.isEmpty ? "--" : entry.snapshot.meetingId)
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Color(red: 0.06, green: 0.08, blue: 0.12))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+
+            Rectangle()
+                .fill(chipStrokeColor)
+                .frame(height: 1)
+
+            HStack(spacing: 7) {
+                glassTag(stageText)
+                if !entry.snapshot.meetingId.isEmpty {
+                    glassTag("\(isChinese ? "会议号" : "ID") \(entry.snapshot.meetingId)", systemImage: "number")
+                }
+                Spacer(minLength: 0)
             }
         }
     }
@@ -283,25 +325,37 @@ private struct MianlemeWidgetView: View {
     private var emptyHomeContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             Spacer(minLength: 0)
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: family == .systemMedium ? 24 : 20, weight: .semibold))
+                .foregroundStyle(accentColor)
+                .symbolRenderingMode(.hierarchical)
             Text(isChinese ? "暂无待进行面试" : "No upcoming interviews")
-                .font(.system(size: family == .systemMedium ? 22 : 18, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color(red: 0.06, green: 0.08, blue: 0.12))
+                .font(.system(size: family == .systemMedium ? 20 : 17, weight: .semibold, design: .rounded))
+                .foregroundStyle(primaryTextColor)
                 .lineLimit(2)
-            Text(isChinese ? "添加面试后会自动显示下一场" : "Add one in the app and it will appear here")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(red: 0.36, green: 0.41, blue: 0.48))
+            Text(isChinese ? "添加后自动同步到小组件" : "Add one in the app")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(secondaryTextColor)
                 .lineLimit(2)
         }
     }
 
-    private func tag(_ text: String, foreground: Color, background: Color) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .bold, design: .rounded))
-            .foregroundStyle(foreground)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(background, in: Capsule())
-            .lineLimit(1)
+    private func glassTag(_ text: String, systemImage: String? = nil, prominent: Bool = false) -> some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            Text(text)
+                .font(.system(size: prominent ? 11 : 12, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .foregroundStyle(prominent ? accentColor : secondaryTextColor)
+        .padding(.horizontal, prominent ? 8 : 9)
+        .padding(.vertical, prominent ? 4 : 5)
+        .background(chipFillColor, in: Capsule())
+        .overlay(Capsule().strokeBorder(chipStrokeColor, lineWidth: 0.8))
     }
 
     @available(iOSApplicationExtension 16.0, *)
@@ -371,26 +425,43 @@ private var mianlemeSupportedFamilies: [WidgetFamily] {
 }
 
 private struct WidgetBackgroundView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isDarkMode: Bool {
+        colorScheme == .dark
+    }
+
     var body: some View {
-        ZStack(alignment: .leading) {
+        ZStack {
             LinearGradient(
-                colors: [
-                    Color(red: 0.97, green: 0.99, blue: 1.0),
-                    Color(red: 0.91, green: 0.97, blue: 0.94),
-                    Color(red: 1.0, green: 0.95, blue: 0.86)
+                colors: isDarkMode ? [
+                    Color(red: 0.08, green: 0.09, blue: 0.11),
+                    Color(red: 0.13, green: 0.14, blue: 0.17),
+                    Color(red: 0.09, green: 0.10, blue: 0.13)
+                ] : [
+                    Color(red: 0.985, green: 0.988, blue: 0.992),
+                    Color(red: 0.945, green: 0.958, blue: 0.975),
+                    Color(red: 0.965, green: 0.975, blue: 0.970)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+
             Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(red: 0.02, green: 0.39, blue: 0.78), Color(red: 0.0, green: 0.58, blue: 0.45)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 5)
+                .fill(.ultraThinMaterial)
+                .opacity(isDarkMode ? 0.16 : 0.36)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(isDarkMode ? 0.10 : 0.62),
+                    Color.white.opacity(0.02)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color.white.opacity(isDarkMode ? 0.09 : 0.58), lineWidth: 1)
         }
     }
 }
