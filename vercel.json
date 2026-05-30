@@ -17,6 +17,10 @@
       "dest": "/api/handler.ts"
     },
     {
+      "src": "/api/generate-prep-pack-stream",
+      "dest": "/api/handler.ts"
+    },
+    {
       "src": "/api/generate-followup-message",
       "dest": "/api/handler.ts"
     },

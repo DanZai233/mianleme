@@ -104,6 +104,16 @@ function createLocalId(prefix: string) {
   return `${prefix}-${crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 }
 
+function parseSseEvent(rawEvent: string) {
+  const lines = rawEvent.split('\n');
+  const event = lines.find((line) => line.startsWith('event:'))?.slice(6).trim() || 'message';
+  const data = lines
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trimStart())
+    .join('\n');
+  return { event, data };
+}
+
 export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, onUpdate, onDelete, hasConflict = false }: Props) {
   const t = useI18n(lang);
   const [showCalendarOptions, setShowCalendarOptions] = useState(false);
@@ -458,8 +468,18 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
       return;
     }
     setIsGeneratingPrep(true);
+    const previousMessages = interview.prepPackMarkdown?.chatMessages || [];
+    const fallbackTitle = `${interview.company || interview.role || 'Interview'} Prep Pack`;
+    const startedAt = new Date().toISOString();
+    let currentDocument = {
+      generatedAt: interview.prepPackMarkdown?.generatedAt || startedAt,
+      updatedAt: startedAt,
+      title: interview.prepPackMarkdown?.title || fallbackTitle,
+      content: '',
+      chatMessages: previousMessages,
+    };
     try {
-      const response = await fetch(apiUrl('/api/generate-prep-pack'), {
+      const response = await fetch(apiUrl('/api/generate-prep-pack-stream'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interview, lang, timezone }),
@@ -468,13 +488,56 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
         const errorData = await response.json().catch(() => null);
         throw new Error(errorData?.error || 'Failed to generate prep pack');
       }
-      const data = await response.json();
-      const previousMessages = interview.prepPackMarkdown?.chatMessages || [];
-      const prepPackMarkdown = {
-        ...normalizeMarkdownResponse(data, `${interview.company || interview.role || 'Interview'} Prep Pack`),
-        chatMessages: previousMessages,
+      if (!response.body) throw new Error('Streaming is unavailable');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finished = false;
+      let lastFlushAt = 0;
+      const flushDocument = (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastFlushAt < 350) return;
+        lastFlushAt = now;
+        onUpdate({ prepPackMarkdown: currentDocument });
       };
-      onUpdate({ prepPackMarkdown });
+
+      while (!finished) {
+        const { value, done } = await reader.read();
+        finished = done;
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const rawEvent of events) {
+          if (!rawEvent.trim()) continue;
+          const { event, data } = parseSseEvent(rawEvent);
+          const payload = data ? JSON.parse(data) : {};
+          if (event === 'meta') {
+            currentDocument = {
+              ...currentDocument,
+              ...normalizeMarkdownResponse({ ...payload, content: currentDocument.content }, fallbackTitle),
+              chatMessages: previousMessages,
+            };
+            flushDocument(true);
+          } else if (event === 'delta') {
+            currentDocument = {
+              ...currentDocument,
+              content: `${currentDocument.content}${String(payload.delta || '')}`,
+              updatedAt: new Date().toISOString(),
+            };
+            flushDocument(false);
+          } else if (event === 'done') {
+            currentDocument = {
+              ...normalizeMarkdownResponse(payload.document, fallbackTitle),
+              chatMessages: previousMessages,
+            };
+            flushDocument(true);
+          } else if (event === 'error') {
+            throw new Error(payload.error || 'Failed to generate prep pack');
+          }
+        }
+      }
       toast.success(t.aiPrepPack);
     } catch (error: any) {
       toast.error(error?.message || t.calendarUnavailable);

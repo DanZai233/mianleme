@@ -463,6 +463,69 @@ Dear Hiring Team, thank you again for speaking with me about the ${role} opportu
   };
 }
 
+function buildFullPrepPackPrompt(lang: "zh" | "en") {
+  if (lang === "zh") {
+    return `你是一个严谨、具体、可执行的求职面试教练。请根据面试信息生成一份完整、详细、可直接使用的 Markdown 面试准备包。
+
+要求：
+- 只输出 Markdown 正文，不要 JSON，不要 Markdown 代码块。
+- 必须深度结合公司、岗位、阶段、备注、岗位 JD、简历片段、公司研究、面试官信息、会议平台、面试时间和时区。
+- 不要编造公司不存在的事实；缺信息时写“需要确认”并给出确认方法。
+- 准备包要足够完整，用户点一次生成后就能直接用于准备。
+- 把简历片段转成可讲述的 STAR 素材，并标出最适合回答哪些问题。
+- 如果 JD 或公司研究里出现明确技能/业务关键词，必须覆盖到能力画像、问题列表和 STAR 案例。
+
+必须包含这些 Markdown 章节：
+# 面试准备包
+## 1. 面试信息摘要
+## 2. 岗位能力画像
+## 3. 公司/业务理解框架
+## 4. 高频问题与答题要点（至少 10 个）
+## 5. 技术/业务深挖问题（至少 8 个）
+## 6. STAR 案例库（至少 5 个，每个包含背景、行动、结果、可量化亮点、适用问题）
+## 7. 可反问面试官的问题（至少 8 个，按 HR/技术/业务/团队分类）
+## 8. 面试前 30 分钟检查清单
+## 9. 风险点与补救话术
+## 10. 会议/链接/备注核对`;
+  }
+
+  return `You are a rigorous, specific, actionable interview coach. Generate a complete, detailed Markdown interview prep pack from the interview data.
+
+Requirements:
+- Output Markdown only. Do not output JSON. Do not wrap in a Markdown code fence.
+- Deeply use company, role, stage, notes, job description, resume snapshot, company research, interviewer info, platform, meeting time, and timezone.
+- Do not invent company facts; mark unknowns as "to confirm" and explain how to confirm.
+- The prep pack should be complete enough for the user to prepare after one generation.
+- Turn resume snippets into usable STAR material and label which questions each story can answer.
+- If the JD or company research contains explicit skill/business keywords, cover them in the competency map, question list, and STAR stories.
+
+The Markdown must include:
+# Interview Prep Pack
+## 1. Interview Summary
+## 2. Role Competency Map
+## 3. Company / Business Understanding Framework
+## 4. Likely Questions and Answer Angles (at least 10)
+## 5. Deep-Dive Technical / Business Questions (at least 8)
+## 6. STAR Story Bank (at least 5, each with situation, action, result, measurable proof, applicable questions)
+## 7. Questions to Ask the Interviewer (at least 8, grouped by HR/technical/business/team)
+## 8. 30-Minute Pre-Interview Checklist
+## 9. Risks and Recovery Talking Points
+## 10. Meeting / Link / Notes Verification`;
+}
+
+function markdownDocumentTitle(interview: any, lang: "zh" | "en", fallback: string) {
+  const company = String(interview?.company || "").trim();
+  const role = String(interview?.role || "").trim();
+  const base = [company, role].filter(Boolean).join(" ");
+  if (!base) return fallback;
+  return lang === "zh" ? `${base} 面试准备包` : `${base} Interview Prep Pack`;
+}
+
+function writeSse(res: express.Response, event: string, data: unknown) {
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
 function firstEnv(names: string[]) {
   for (const name of names) {
     const value = process.env[name]?.trim();
@@ -699,6 +762,39 @@ async function callModel(prompt: string, text: string, imageBase64?: string) {
   }
 }
 
+async function streamTextModel(prompt: string, text: string, onDelta: (delta: string) => void | Promise<void>) {
+  const { provider, apiKey, modelName, apiBase } = getServerAiConfig();
+
+  if (provider !== "volcengine" && provider !== "openai") {
+    const data = await callModel(`${prompt}\n\nReturn JSON with this shape: {"content":"markdown"}`, text);
+    const content = typeof data === "string" ? data : String(data?.content || "");
+    if (content) await onDelta(content);
+    return;
+  }
+
+  const openai = new OpenAI({
+    apiKey,
+    baseURL: apiBase,
+  });
+
+  const stream = await openai.chat.completions.create({
+    model: modelName,
+    messages: [
+      {
+        role: "user",
+        content: `${text}\n\n${prompt}`,
+      },
+    ],
+    temperature: 0,
+    stream: true,
+  });
+
+  for await (const part of stream) {
+    const delta = part.choices?.[0]?.delta?.content || "";
+    if (delta) await onDelta(delta);
+  }
+}
+
 const parseInterview = async (req: express.Request, res: express.Response) => {
   try {
     const { text, imageBase64 } = req.body;
@@ -819,6 +915,48 @@ Output:
   } catch (error: any) {
     console.error("Prep Pack Error:", error);
     res.status(500).json({ error: error?.message || "生成准备包失败" });
+  }
+};
+
+const generatePrepPackStream = async (req: express.Request, res: express.Response) => {
+  const lang = req.body?.lang === "en" ? "en" : "zh";
+  const interview = req.body?.interview || {};
+  const timezone = normalizeTimezone(req.body?.timezone);
+  const title = markdownDocumentTitle(interview, lang, lang === "zh" ? "面试准备包" : "Interview Prep Pack");
+
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  const generatedAt = new Date().toISOString();
+  let content = "";
+  writeSse(res, "meta", { generatedAt, updatedAt: generatedAt, title });
+
+  try {
+    await streamTextModel(
+      buildFullPrepPackPrompt(lang),
+      JSON.stringify({ timezone, interview }, null, 2),
+      async (delta) => {
+        content += delta;
+        writeSse(res, "delta", { delta });
+      }
+    );
+
+    const updatedAt = new Date().toISOString();
+    writeSse(res, "done", {
+      document: {
+        generatedAt,
+        updatedAt,
+        title,
+        content: content.trim(),
+      },
+    });
+    res.end();
+  } catch (error: any) {
+    console.error("Prep Pack Stream Error:", error);
+    writeSse(res, "error", { error: error?.message || "生成准备包失败" });
+    res.end();
   }
 };
 
@@ -954,6 +1092,7 @@ const calendarInvite = (req: express.Request, res: express.Response) => {
 
 app.post(["/parse-interview", "/api/parse-interview"], parseInterview);
 app.post(["/generate-prep-pack", "/api/generate-prep-pack"], generatePrepPack);
+app.post(["/generate-prep-pack-stream", "/api/generate-prep-pack-stream"], generatePrepPackStream);
 app.post(["/generate-followup-message", "/api/generate-followup-message"], generateFollowUpMessage);
 app.post(["/chat-document", "/api/chat-document"], chatDocument);
 app.get(["/calendar.ics", "/api/calendar.ics"], calendarInvite);
