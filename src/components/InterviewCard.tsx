@@ -480,11 +480,26 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
     };
     try {
       const sections = ['overview', 'questions', 'deepDive', 'star', 'closing'];
-      let accumulatedContent = `# ${lang === 'zh' ? '面试准备包' : 'Interview Prep Pack'}\n\n`;
-      onUpdate({ prepPackMarkdown: { ...currentDocument, content: accumulatedContent } });
+      const sectionContent: Record<string, string> = Object.fromEntries(sections.map((section) => [section, '']));
+      const composeContent = () => {
+        const body = sections.map((section) => sectionContent[section].trim()).filter(Boolean).join('\n\n');
+        return `# ${lang === 'zh' ? '面试准备包' : 'Interview Prep Pack'}\n\n${body}`.trim();
+      };
+      let lastFlushAt = 0;
+      const flushDocument = (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastFlushAt < 500) return;
+        lastFlushAt = now;
+        currentDocument = {
+          ...currentDocument,
+          content: composeContent(),
+          updatedAt: new Date().toISOString(),
+        };
+        onUpdate({ prepPackMarkdown: currentDocument });
+      };
+      flushDocument(true);
 
-      for (const sectionId of sections) {
-        let sectionContent = '';
+      await Promise.all(sections.map(async (sectionId) => {
         const response = await fetch(apiUrl('/api/generate-prep-pack-stream'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -500,18 +515,6 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
         const decoder = new TextDecoder();
         let buffer = '';
         let finished = false;
-        let lastFlushAt = 0;
-        const flushDocument = (force = false) => {
-          const now = Date.now();
-          if (!force && now - lastFlushAt < 350) return;
-          lastFlushAt = now;
-          currentDocument = {
-            ...currentDocument,
-            content: `${accumulatedContent}${sectionContent}`,
-            updatedAt: new Date().toISOString(),
-          };
-          onUpdate({ prepPackMarkdown: currentDocument });
-        };
 
         while (!finished) {
           const { value, done } = await reader.read();
@@ -533,25 +536,18 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
               };
               flushDocument(true);
             } else if (event === 'delta') {
-              sectionContent = `${sectionContent}${String(payload.delta || '')}`;
+              sectionContent[sectionId] = `${sectionContent[sectionId]}${String(payload.delta || '')}`;
               flushDocument(false);
             } else if (event === 'done') {
-              sectionContent = String(payload.document?.content || sectionContent).trim();
+              sectionContent[sectionId] = String(payload.document?.content || sectionContent[sectionId]).trim();
               flushDocument(true);
             } else if (event === 'error') {
               throw new Error(payload.error || 'Failed to generate prep pack');
             }
           }
         }
-
-        accumulatedContent = `${accumulatedContent}${sectionContent.trim()}\n\n`;
-        currentDocument = {
-          ...currentDocument,
-          content: accumulatedContent.trim(),
-          updatedAt: new Date().toISOString(),
-        };
-        onUpdate({ prepPackMarkdown: currentDocument });
-      }
+      }));
+      flushDocument(true);
       toast.success(t.aiPrepPack);
     } catch (error: any) {
       toast.error(error?.message || t.calendarUnavailable);
