@@ -42,6 +42,271 @@ function normalizeMarkdownDocumentOutput(data: any, fallbackTitle: string) {
   };
 }
 
+function compactText(value: unknown, fallback: string, maxLength = 360) {
+  const text = String(value || "").trim().replace(/\s+/g, " ");
+  if (!text) return fallback;
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function extractKeywords(interview: any, lang: "zh" | "en") {
+  const text = [
+    interview?.role,
+    interview?.stage,
+    interview?.notes,
+    interview?.jobDescription,
+    interview?.resumeSnapshot,
+    interview?.companyResearch,
+    interview?.interviewerInfo,
+  ].filter(Boolean).join(" ");
+  const stopWords = new Set([
+    "负责", "要求", "经验", "岗位", "公司", "业务", "项目", "能力", "面试", "团队", "相关",
+    "the", "and", "for", "with", "role", "team", "work", "project", "experience",
+  ]);
+  const matches = text.match(/[A-Za-z][A-Za-z0-9+#./-]{1,}|[\u4e00-\u9fa5]{2,8}/g) || [];
+  return Array.from(new Set(matches.map((item) => item.trim()).filter((item) => item.length > 1 && !stopWords.has(item.toLowerCase())))).slice(0, 8);
+}
+
+function buildPrepPackDraft(interview: any, lang: "zh" | "en", timezone: string) {
+  const company = compactText(interview?.company, lang === "zh" ? "待确认公司" : "Company to confirm", 80);
+  const role = compactText(interview?.role, lang === "zh" ? "待确认岗位" : "Role to confirm", 80);
+  const stage = compactText(interview?.stage, lang === "zh" ? "待确认阶段" : "Stage to confirm", 80);
+  const date = compactText(interview?.date, lang === "zh" ? "待确认时间" : "Time to confirm", 80);
+  const platform = compactText(interview?.platform, lang === "zh" ? "待确认平台" : "Platform to confirm", 80);
+  const notes = compactText(interview?.notes, lang === "zh" ? "暂无备注" : "No notes yet");
+  const jd = compactText(interview?.jobDescription, lang === "zh" ? "未填写 JD：建议补充职责、技术栈、业务目标和任职要求。" : "No JD yet: add responsibilities, stack, business goals, and requirements.");
+  const resume = compactText(interview?.resumeSnapshot, lang === "zh" ? "未填写简历片段：建议补充 2-3 个最匹配项目和量化结果。" : "No resume snapshot yet: add 2-3 matching projects and measurable results.");
+  const research = compactText(interview?.companyResearch, lang === "zh" ? "未填写公司研究：建议补充产品、客户、商业模式、近期动态。" : "No company research yet: add product, customer, business model, and recent updates.");
+  const interviewer = compactText(interview?.interviewerInfo, lang === "zh" ? "未填写面试官信息。" : "No interviewer info yet.");
+  const keywords = extractKeywords(interview, lang);
+  const keywordText = keywords.length ? keywords.join(" / ") : (lang === "zh" ? "需要从 JD 中确认" : "to confirm from JD");
+  const title = lang === "zh" ? `${company} ${role} 面试准备包` : `${company} ${role} Interview Prep Pack`;
+
+  if (lang === "en") {
+    return {
+      title,
+      content: `# Interview Prep Pack
+
+## 1. Interview Summary
+- Company: ${company}
+- Role: ${role}
+- Stage: ${stage}
+- Time / timezone: ${date} (${timezone})
+- Platform: ${platform}
+- Notes: ${notes}
+- Keywords to cover: ${keywordText}
+
+## 2. Role Competency Map
+- Core match: connect the JD requirements to your strongest resume proof.
+- JD: ${jd}
+- Resume proof: ${resume}
+- Prepare one clear metric for every important skill keyword.
+
+## 3. Company / Business Understanding Framework
+- Current understanding: ${research}
+- Explain the likely user, product value, monetization, and operational bottleneck.
+- Mark unknown facts as "to confirm" and verify them from the website, product pages, and recruiter messages.
+
+## 4. Likely Questions and Answer Angles
+1. Tell me about yourself. Focus on ${role}, ${keywordText}, and one measurable result.
+2. Why this company? Tie ${company}'s business context to your motivation.
+3. Why this role? Map JD needs to your resume proof.
+4. Walk me through your most relevant project. Use situation, responsibility, decisions, result.
+5. What was the hardest technical/business tradeoff? Explain options and why you chose one.
+6. How do you measure success? Pick metrics that match the JD and business.
+7. Describe a failure or conflict. Show ownership and what changed afterward.
+8. How would you start in the first 30/60/90 days? Learn context, ship a focused win, then scale.
+9. What are your strengths and gaps? Keep strengths role-specific and gaps manageable.
+10. What questions do you have for us? Ask about team goals, success metrics, and constraints.
+
+## 5. Deep-Dive Technical / Business Questions
+1. Which parts of the JD have you used in production? Prepare examples for ${keywordText}.
+2. How did you design reusable components or systems under changing requirements?
+3. How did you improve performance, quality, or delivery speed? Use before/after metrics.
+4. How do you debug a hard production issue from symptom to root cause?
+5. How do you balance product speed with maintainability?
+6. How do you collaborate with product/design/business stakeholders?
+7. What would you inspect first in ${company}'s product or workflow?
+8. What risk would you watch if joining this team?
+
+## 6. STAR Story Bank
+1. Relevant project: use ${resume}; emphasize your action and measurable impact.
+2. Performance/quality improvement: describe baseline, bottleneck, fix, and result.
+3. Cross-functional delivery: show how you aligned priorities and managed scope.
+4. Difficult problem: explain investigation path and what you learned.
+5. Fast learning: connect a new skill to a delivered business outcome.
+
+## 7. Questions to Ask the Interviewer
+- HR: What does success look like in probation?
+- HR: What is the hiring timeline after this round?
+- Technical: What are the current engineering quality priorities?
+- Technical: Which systems or modules need the most improvement?
+- Business: What user or revenue metric matters most this quarter?
+- Business: What makes this team different from competitors?
+- Team: Who would I work with most closely?
+- Team: What would the first high-impact project likely be?
+
+## 8. 30-Minute Pre-Interview Checklist
+- Reopen resume, JD, meeting link, and this prep pack.
+- Prepare 2 STAR stories and 2 questions you must ask.
+- Test camera, mic, network, screen sharing, and charger.
+- Turn off notifications and keep water nearby.
+- Join 3-5 minutes early.
+
+## 9. Risks and Recovery Talking Points
+- Missing company facts: "I still need to confirm that detail, but my current understanding is..."
+- Unknown technical detail: reason from first principles and explain how you would verify.
+- Weak resume match: bridge from adjacent experience and state your ramp-up plan.
+- Nervous pause: ask for 10 seconds to structure the answer.
+
+## 10. Meeting / Link / Notes Verification
+- Platform: ${platform}
+- Interviewer: ${interviewer}
+- Link / meeting ID: ${compactText(interview?.link || interview?.meetingId, "to confirm", 120)}
+- Final note: ${notes}`,
+    };
+  }
+
+  return {
+    title,
+    content: `# 面试准备包
+
+## 1. 面试信息摘要
+- 公司：${company}
+- 岗位：${role}
+- 阶段：${stage}
+- 时间/时区：${date}（${timezone}）
+- 平台：${platform}
+- 备注：${notes}
+- 本场关键词：${keywordText}
+
+## 2. 岗位能力画像
+- 核心匹配：把 JD 要求和你最强的项目证据一一对应。
+- JD 摘要：${jd}
+- 简历证据：${resume}
+- 准备原则：每个重要技能关键词都准备一个项目、一个动作、一个量化结果。
+
+## 3. 公司/业务理解框架
+- 当前研究：${research}
+- 面试前补齐：产品/客户是谁、解决什么问题、怎么赚钱、当前增长或效率瓶颈在哪里。
+- 不确定信息统一标记“需要确认”，可从官网、招聘 JD、产品页面、HR 消息里核对。
+
+## 4. 高频问题与答题要点
+1. 请做自我介绍：用「岗位匹配 + 关键词 ${keywordText} + 量化成果」讲 2 分钟。
+2. 为什么选择 ${company}：结合业务理解和你能解决的问题，不讲空泛喜欢。
+3. 为什么适合 ${role}：按 JD 要求逐条映射项目经历。
+4. 介绍一个最相关项目：说清背景、你的职责、关键决策、结果。
+5. 最难的技术/业务取舍：讲候选方案、选择原因、复盘。
+6. 如何衡量工作成功：用和业务/JD 对齐的指标回答。
+7. 遇到冲突或失败怎么办：强调 ownership、沟通和改进。
+8. 入职 30/60/90 天计划：先理解业务，再交付小胜利，最后沉淀机制。
+9. 优势和短板：优势贴岗位，短板要可控且有改进动作。
+10. 你有什么问题：围绕团队目标、成功标准、当前挑战反问。
+
+## 5. 技术/业务深挖问题
+1. JD 里的 ${keywordText}，你哪些在生产项目里真正做过？
+2. 你如何设计可复用组件/模块，面对需求变化怎么保持可维护？
+3. 你做过哪些性能、质量或效率优化？准备优化前后指标。
+4. 线上问题从现象到根因，你的排查路径是什么？
+5. 如何平衡交付速度和长期工程质量？
+6. 和产品/设计/业务方意见不一致时怎么推进？
+7. 如果接手 ${company} 的相关业务，你会先看哪些数据或流程？
+8. 你认为这个岗位最大的风险是什么，怎么提前降低？
+
+## 6. STAR 案例库
+1. 最相关项目：基于「${resume}」讲背景、你的动作、量化结果，适合回答项目深挖。
+2. 性能/质量优化：讲基线、瓶颈、方案、结果，适合回答 ${keywordText}。
+3. 跨部门协作：讲目标冲突、对齐方法、最终交付，适合回答沟通题。
+4. 复杂问题排查：讲定位路径和复盘机制，适合回答抗压和解决问题。
+5. 快速学习落地：讲新技术/新业务如何转成结果，适合回答成长性。
+
+## 7. 可反问面试官的问题
+- HR：试用期成功标准是什么？
+- HR：后续面试和反馈节奏是怎样的？
+- 技术：团队当前最关注的工程质量问题是什么？
+- 技术：哪些模块最需要重构或性能优化？
+- 业务：这个岗位今年最重要的业务指标是什么？
+- 业务：当前业务增长或交付最大的瓶颈在哪里？
+- 团队：入职后主要合作对象是谁？
+- 团队：前三个月最可能负责的高影响项目是什么？
+
+## 8. 面试前 30 分钟检查清单
+- 打开简历、JD、会议链接和这份准备包。
+- 选定 2 个必须讲好的 STAR 案例和 2 个必须反问的问题。
+- 测试摄像头、麦克风、网络、屏幕共享和电量。
+- 关闭通知，准备水和纸笔。
+- 提前 3-5 分钟进入会议。
+
+## 9. 风险点与补救话术
+- 公司事实不确定：“这点我还需要确认，我目前的理解是……也想请教您实际情况。”
+- 技术细节不会：“我没有直接做过，但我会从……路径排查/验证。”
+- 经验不完全匹配：用相邻项目证明迁移能力，并给出上手计划。
+- 临场卡顿：“我整理 10 秒再回答，避免漏掉关键点。”
+
+## 10. 会议/链接/备注核对
+- 平台：${platform}
+- 面试官：${interviewer}
+- 链接/会议号：${compactText(interview?.link || interview?.meetingId, "需要确认", 120)}
+- 最后提醒：${notes}`,
+  };
+}
+
+function buildFollowUpDraft(interview: any, lang: "zh" | "en") {
+  const company = compactText(interview?.company, lang === "zh" ? "贵司" : "your team", 80);
+  const role = compactText(interview?.role, lang === "zh" ? "相关岗位" : "the role", 80);
+  const review = compactText(interview?.review || interview?.notes, lang === "zh" ? "今天交流的岗位职责、团队目标和后续安排" : "the role responsibilities, team goals, and next steps");
+  const jd = compactText(interview?.jobDescription, lang === "zh" ? "岗位要求" : "role requirements", 160);
+  const resume = compactText(interview?.resumeSnapshot, lang === "zh" ? "我的相关项目经历" : "my relevant project experience", 160);
+  const title = lang === "zh" ? `${company} ${role} 跟进模板` : `${company} ${role} Follow-up Templates`;
+
+  if (lang === "en") {
+    return {
+      title,
+      content: `# Follow-up Templates
+
+## Thank-you Note
+**When to send:** within 24 hours after the interview.
+
+Hi, thank you again for taking the time to speak with me about ${role}. I appreciated learning more about ${review}. The conversation made me more interested in ${company}, especially because the role connects strongly with ${jd}. My experience with ${resume} feels relevant to the problems your team is working on. Please let me know if I can share any additional material.
+
+## Progress Check
+**When to send:** after the expected feedback date or 3-5 business days.
+
+Hi, I hope you are doing well. I wanted to politely check whether there is any update on the ${role} interview process. I remain very interested in the opportunity at ${company}. If there is anything else I can provide, I would be happy to send it over.
+
+## Addendum
+**When to send:** when you want to clarify an answer or share supporting material.
+
+Hi, after reflecting on our conversation, I wanted to add one point related to ${jd}. In my previous work, ${resume}, which may be useful context for evaluating my fit. I am happy to provide more detail if helpful.
+
+## English Follow-up
+Use the thank-you or progress-check version above depending on timing. Keep it concise, specific, and tied to ${company}'s role needs.`,
+    };
+  }
+
+  return {
+    title,
+    content: `# 感谢/跟进模板
+
+## 感谢面试官
+**发送时机：** 面试后 24 小时内。
+
+您好，感谢您今天抽时间和我交流 ${role}。今天聊到的「${review}」让我对 ${company} 和这个岗位有了更具体的理解。结合岗位要求「${jd}」，我也觉得自己过往「${resume}」的经历和团队需要解决的问题比较匹配。如果后续需要我补充项目材料、作品集或更详细的案例说明，我可以随时整理发送。再次感谢，祝工作顺利！
+
+## 询问进度
+**发送时机：** 超过约定反馈时间，或面试后 3-5 个工作日仍未收到消息。
+
+您好，打扰您。我想礼貌跟进一下 ${company} ${role} 的面试进展。目前我依然对这个机会非常感兴趣，也愿意继续补充任何有助于评估的材料。辛苦您，有更新时麻烦告知我，谢谢！
+
+## 补充材料/补充回答
+**发送时机：** 面试后想到更完整的回答，或需要补充项目证据时。
+
+您好，我复盘今天的交流后，想补充一点和「${jd}」相关的内容：我之前在「${resume}」中积累过相近经验，尤其可以支持岗位里提到的关键要求。如果您方便，我也可以进一步补充项目过程、指标变化和我的具体负责部分，供您参考。
+
+## 英文跟进
+Dear Hiring Team, thank you again for speaking with me about the ${role} opportunity at ${company}. I enjoyed learning more about the team and the role expectations. My experience with ${resume} aligns well with ${jd}, and I would be happy to provide any additional information if helpful. Best regards.`,
+  };
+}
+
 function normalizeTimezone(timezone?: string) {
   const fallback = "UTC";
   if (!timezone) return fallback;
@@ -379,8 +644,7 @@ Output:
   "content": "# Interview Prep Pack\\n..."
 }`;
 
-      const data = await callModel(prompt, JSON.stringify({ timezone, interview }, null, 2));
-      res.json(normalizeMarkdownDocumentOutput(data, lang === "zh" ? "面试准备包" : "Interview Prep Pack"));
+      res.json(normalizeMarkdownDocumentOutput(buildPrepPackDraft(interview, lang, timezone), lang === "zh" ? "面试准备包" : "Interview Prep Pack"));
     } catch (error: any) {
       console.error("Prep Pack Error:", error);
       res.status(500).json({ error: error?.message || "生成准备包失败" });
@@ -425,8 +689,7 @@ Output:
   "content": "# Follow-up Templates\\n..."
 }`;
 
-      const data = await callModel(prompt, JSON.stringify({ interview }, null, 2));
-      res.json(normalizeMarkdownDocumentOutput(data, lang === "zh" ? "感谢/跟进模板" : "Follow-up Templates"));
+      res.json(normalizeMarkdownDocumentOutput(buildFollowUpDraft(interview, lang), lang === "zh" ? "感谢/跟进模板" : "Follow-up Templates"));
     } catch (error: any) {
       console.error("Follow-up Template Error:", error);
       res.status(500).json({ error: error?.message || "生成跟进模板失败" });
