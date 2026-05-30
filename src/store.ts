@@ -30,6 +30,10 @@ function normalizeInterview(interview: Partial<Interview>): Interview {
     link: String(interview.link || ""),
     meetingId: String(interview.meetingId || ""),
     notes: String(interview.notes || ""),
+    jobDescription: String(interview.jobDescription || ""),
+    resumeSnapshot: String(interview.resumeSnapshot || ""),
+    companyResearch: String(interview.companyResearch || ""),
+    interviewerInfo: String(interview.interviewerInfo || ""),
     review: String(interview.review || ""),
     result: result as Interview["result"],
     stage,
@@ -57,6 +61,7 @@ function normalizeMarkdownDocument(value: unknown): InterviewMarkdownDocument | 
     updatedAt: String(doc.updatedAt || generatedAt),
     title: String(doc.title || "Interview document"),
     content,
+    chatMessages: normalizeChatMessages(doc.chatMessages),
   };
 }
 
@@ -76,6 +81,7 @@ function prepPackToMarkdown(pack: InterviewPrepPack | null, interview: Partial<I
     updatedAt: pack.generatedAt,
     title,
     content,
+    chatMessages: [],
   } : null;
 }
 
@@ -94,7 +100,21 @@ function followUpTemplatesToMarkdown(templates: FollowUpTemplates | null, interv
     updatedAt: templates.generatedAt,
     title,
     content,
+    chatMessages: [],
   } : null;
+}
+
+function normalizeChatMessages(value: unknown): InterviewMarkdownDocument["chatMessages"] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((message: any, index) => ({
+      id: String(message?.id || `chat-${index}`),
+      role: message?.role === "assistant" ? "assistant" as const : "user" as const,
+      content: String(message?.content || "").trim(),
+      createdAt: String(message?.createdAt || new Date().toISOString()),
+    }))
+    .filter((message) => message.content)
+    .slice(-50);
 }
 
 function normalizePrepChecklist(value: unknown): PrepChecklistItem[] {

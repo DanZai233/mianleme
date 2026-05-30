@@ -334,7 +334,9 @@ Output JSON format strictly:
 要求：
 - 内容要具体、可直接照着准备，移动端阅读友好。
 - 不要编造公司事实；缺信息时写“需要确认”并给出确认方法。
-- 结合公司、岗位、阶段、备注、会议平台、面试时间和时区。
+- 深度结合公司、岗位、阶段、备注、岗位 JD、简历片段、公司研究、面试官信息、会议平台、面试时间和时区。
+- 把简历片段转成可讲述的 STAR 素材，并标出最适合回答哪些问题。
+- 如果 JD 或公司研究里出现明确技能/业务关键词，必须在能力画像和问题列表中覆盖。
 - 输出 JSON only，不要 Markdown 代码块。
 
 输出格式：
@@ -360,7 +362,9 @@ The Markdown must include:
 Requirements:
 - Be specific, practical, and mobile-friendly.
 - Do not invent company facts; mark unknowns as "to confirm" and explain how to confirm.
-- Use company, role, stage, notes, platform, meeting time, and timezone.
+- Deeply use company, role, stage, notes, job description, resume snapshot, company research, interviewer info, platform, meeting time, and timezone.
+- Turn resume snippets into usable STAR material and label which questions each story can answer.
+- If the JD or company research contains explicit skill/business keywords, cover them in the competency map and question list.
 - Return JSON only. Do not wrap it in a Markdown fence.
 
 Output:
@@ -391,6 +395,7 @@ Output:
 - englishFollowUp: 英文跟进消息，语气专业。
 - 不要出现占位符，信息不足时写得通用一些。
 - Markdown 文档需要包含每个模板的适用场景、发送时机、正文。
+- 尽量结合公司、岗位、面试阶段、面后复盘、JD、简历片段和公司研究，让内容不像通用套话。
 
 输出格式：
 {
@@ -406,6 +411,7 @@ Requirements:
 - englishFollowUp: a polished English follow-up note.
 - Do not use placeholders; keep it useful when details are missing.
 - The Markdown must include use case, timing, and body for each template.
+- Use company, role, stage, post-interview notes, JD, resume snapshot, and company research whenever available so the messages do not feel generic.
 
 Output:
 {
@@ -441,6 +447,8 @@ Output:
 - 如果用户要求修改/补充/润色，请直接返回完整更新后的 Markdown 文档。
 - 准备包文档要尽可能详细、具体、可执行。
 - 不要编造公司事实；不确定处标记“需要确认”。
+- 参考并延续历史对话，不要让用户重复说明。
+- 优先利用这场面试绑定的 JD、简历片段、公司研究和面试官信息。
 - 只返回 JSON。
 
 输出格式：
@@ -456,6 +464,8 @@ Rules:
 - If the user asks to edit, expand, or polish, return the complete updated Markdown document.
 - Prep documents should be detailed, specific, and actionable.
 - Do not invent company facts; mark uncertain facts as "to confirm".
+- Use and continue the chat history so the user does not need to repeat context.
+- Prioritize the interview's attached JD, resume snapshot, company research, and interviewer info.
 - Return JSON only.
 
 Output:
@@ -467,11 +477,12 @@ Output:
 
       const data = await callModel(prompt, JSON.stringify({
         timezone,
-        documentType,
-        interview,
-        document,
-        userRequest: message,
-      }, null, 2));
+      documentType,
+      interview,
+      document,
+      chatMessages: req.body?.chatMessages || document.chatMessages || [],
+      userRequest: message,
+    }, null, 2));
 
       const normalized = normalizeMarkdownDocumentOutput(data, document.title || (documentType === "prep" ? "Interview Prep Pack" : "Follow-up Templates"));
       res.json({

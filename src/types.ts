@@ -29,6 +29,14 @@ export interface InterviewMarkdownDocument {
   updatedAt: string;
   title: string;
   content: string;
+  chatMessages: InterviewDocumentChatMessage[];
+}
+
+export interface InterviewDocumentChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
 }
 
 export interface Interview {
@@ -40,6 +48,10 @@ export interface Interview {
   link: string;
   meetingId: string;
   notes: string;
+  jobDescription: string;
+  resumeSnapshot: string;
+  companyResearch: string;
+  interviewerInfo: string;
   review: string;
   result: InterviewResult;
   stage: InterviewStage;

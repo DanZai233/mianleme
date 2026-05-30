@@ -50,6 +50,10 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
       link: '',
       meetingId: '',
       notes: '',
+      jobDescription: '',
+      resumeSnapshot: '',
+      companyResearch: '',
+      interviewerInfo: '',
       review: '',
       result: 'unknown',
       stage: 'applied',
@@ -337,6 +341,49 @@ export function AddInterviewModal({ initialData, lang, onClose, onSave, existing
             <div className="relative">
               <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.meetingId}</label>
               <input type="text" value={formData.meetingId} onChange={e => setFormData({...formData, meetingId: e.target.value})} className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none" />
+            </div>
+
+            <div className="bg-white/70 dark:bg-white/5 rounded-3xl p-4 space-y-4 border border-white/70 dark:border-white/10">
+              <div>
+                <p className="text-[11px] font-bold text-gray-500 uppercase ml-1">{t.aiContext}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-1">{t.aiContextHint}</p>
+              </div>
+              <div className="relative">
+                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.jobDescription}</label>
+                <textarea
+                  value={formData.jobDescription}
+                  onChange={e => setFormData({...formData, jobDescription: e.target.value})}
+                  placeholder={t.jobDescriptionPlaceholder}
+                  className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none h-28 resize-none"
+                />
+              </div>
+              <div className="relative">
+                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.resumeSnapshot}</label>
+                <textarea
+                  value={formData.resumeSnapshot}
+                  onChange={e => setFormData({...formData, resumeSnapshot: e.target.value})}
+                  placeholder={t.resumeSnapshotPlaceholder}
+                  className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none h-28 resize-none"
+                />
+              </div>
+              <div className="relative">
+                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.companyResearch}</label>
+                <textarea
+                  value={formData.companyResearch}
+                  onChange={e => setFormData({...formData, companyResearch: e.target.value})}
+                  placeholder={t.companyResearchPlaceholder}
+                  className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none h-24 resize-none"
+                />
+              </div>
+              <div className="relative">
+                <label className="text-[11px] font-bold text-gray-500 uppercase ml-1 mb-1 block">{t.interviewerInfo}</label>
+                <textarea
+                  value={formData.interviewerInfo}
+                  onChange={e => setFormData({...formData, interviewerInfo: e.target.value})}
+                  placeholder={t.interviewerInfoPlaceholder}
+                  className="w-full bg-white dark:bg-[#1C1C1E] text-black dark:text-white px-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm dark:shadow-none h-24 resize-none"
+                />
+              </div>
             </div>
 
             <div className="relative">

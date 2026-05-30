@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Clock,
   Copy,
+  FileText,
   Download,
   Edit2,
   ExternalLink,
@@ -95,7 +96,12 @@ function normalizeMarkdownResponse(data: any, fallbackTitle: string) {
     updatedAt: String(data?.updatedAt || data?.generatedAt || now),
     title: String(data?.title || fallbackTitle),
     content: String(data?.content || '').trim(),
+    chatMessages: Array.isArray(data?.chatMessages) ? data.chatMessages : [],
   };
+}
+
+function createLocalId(prefix: string) {
+  return `${prefix}-${crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 }
 
 export function InterviewCard({ interview, lang, timezone, onEdit, onComplete, onUpdate, onDelete, hasConflict = false }: Props) {
@@ -463,7 +469,11 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
         throw new Error(errorData?.error || 'Failed to generate prep pack');
       }
       const data = await response.json();
-      const prepPackMarkdown = normalizeMarkdownResponse(data, `${interview.company || interview.role || 'Interview'} Prep Pack`);
+      const previousMessages = interview.prepPackMarkdown?.chatMessages || [];
+      const prepPackMarkdown = {
+        ...normalizeMarkdownResponse(data, `${interview.company || interview.role || 'Interview'} Prep Pack`),
+        chatMessages: previousMessages,
+      };
       onUpdate({ prepPackMarkdown });
       toast.success(t.aiPrepPack);
     } catch (error: any) {
@@ -490,7 +500,11 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
         throw new Error(errorData?.error || 'Failed to generate templates');
       }
       const data = await response.json();
-      const followUpTemplatesMarkdown = normalizeMarkdownResponse(data, `${interview.company || interview.role || 'Interview'} Follow-up Templates`);
+      const previousMessages = interview.followUpTemplatesMarkdown?.chatMessages || [];
+      const followUpTemplatesMarkdown = {
+        ...normalizeMarkdownResponse(data, `${interview.company || interview.role || 'Interview'} Follow-up Templates`),
+        chatMessages: previousMessages,
+      };
       onUpdate({ followUpTemplatesMarkdown });
       toast.success(t.followUpTemplates);
     } catch (error: any) {
@@ -560,6 +574,20 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
             <div className="rounded-2xl bg-[#F2F2F7] dark:bg-black/40 p-4">
               <p className="text-[11px] font-bold uppercase text-gray-500 mb-2">{t.notes}</p>
               <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-300">{interview.notes}</p>
+            </div>
+          )}
+
+          {(interview.jobDescription || interview.resumeSnapshot || interview.companyResearch || interview.interviewerInfo) && (
+            <div className="rounded-2xl bg-amber-50 dark:bg-amber-500/10 p-4">
+              <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase text-amber-700 dark:text-amber-300">
+                <FileText size={15} /> {t.aiContext}
+              </div>
+              <div className="space-y-3">
+                {interview.jobDescription && <ContextBlock title={t.jobDescription} text={interview.jobDescription} />}
+                {interview.resumeSnapshot && <ContextBlock title={t.resumeSnapshot} text={interview.resumeSnapshot} />}
+                {interview.companyResearch && <ContextBlock title={t.companyResearch} text={interview.companyResearch} />}
+                {interview.interviewerInfo && <ContextBlock title={t.interviewerInfo} text={interview.interviewerInfo} />}
+              </div>
             </div>
           )}
 
@@ -698,18 +726,11 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
   );
 }
 
-function PrepPackSection({ title, items }: { title: string; items: string[] }) {
-  if (!items.length) return null;
+function ContextBlock({ title, text }: { title: string; text: string }) {
   return (
     <div className="rounded-xl bg-white/80 dark:bg-black/20 p-3">
-      <p className="mb-2 text-[11px] font-bold uppercase text-gray-500">{title}</p>
-      <ul className="space-y-1.5">
-        {items.map((item, index) => (
-          <li key={`${title}-${index}`} className="text-sm leading-relaxed text-gray-700 dark:text-gray-200">
-            {index + 1}. {item}
-          </li>
-        ))}
-      </ul>
+      <p className="mb-1 text-[11px] font-bold uppercase text-gray-500">{title}</p>
+      <p className="max-h-32 overflow-auto whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-200">{text}</p>
     </div>
   );
 }
@@ -735,7 +756,6 @@ function MarkdownDocumentPanel({
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(document.content);
   const [aiMessage, setAiMessage] = useState('');
-  const [aiReply, setAiReply] = useState('');
   const [isChatting, setIsChatting] = useState(false);
 
   useEffect(() => {
@@ -769,15 +789,27 @@ function MarkdownDocumentPanel({
       return;
     }
     setIsChatting(true);
+    const now = new Date().toISOString();
+    const userMessage = {
+      id: createLocalId('user'),
+      role: 'user' as const,
+      content: aiMessage.trim(),
+      createdAt: now,
+    };
+    const optimisticMessages = [...(document.chatMessages || []), userMessage];
+    const currentMessage = aiMessage.trim();
+    onSave({ ...document, chatMessages: optimisticMessages, updatedAt: now });
+    setAiMessage('');
     try {
       const response = await fetch(apiUrl('/api/chat-document'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           interview,
-          document,
+          document: { ...document, chatMessages: optimisticMessages },
           documentType,
-          message: aiMessage,
+          message: currentMessage,
+          chatMessages: optimisticMessages,
           lang,
           timezone,
         }),
@@ -787,12 +819,20 @@ function MarkdownDocumentPanel({
         throw new Error(errorData?.error || 'Failed to update document');
       }
       const data = await response.json();
-      const nextDocument = normalizeMarkdownResponse(data.document, document.title);
+      const assistantMessage = {
+        id: createLocalId('assistant'),
+        role: 'assistant' as const,
+        content: String(data.reply || ''),
+        createdAt: new Date().toISOString(),
+      };
+      const nextDocument = {
+        ...normalizeMarkdownResponse(data.document, document.title),
+        chatMessages: [...optimisticMessages, assistantMessage].filter((message) => message.content).slice(-50),
+      };
       onSave(nextDocument);
       setDraft(nextDocument.content);
-      setAiReply(String(data.reply || ''));
-      setAiMessage('');
     } catch (error: any) {
+      onSave({ ...document, chatMessages: document.chatMessages || [] });
       toast.error(error?.message || t.calendarUnavailable);
     } finally {
       setIsChatting(false);
@@ -834,6 +874,25 @@ function MarkdownDocumentPanel({
 
       <div className="rounded-xl bg-white/80 dark:bg-black/20 p-3">
         <p className="mb-2 text-[11px] font-bold uppercase text-gray-500">{t.aiDocumentChat}</p>
+        {document.chatMessages.length > 0 && (
+          <div className="mb-3 max-h-64 space-y-2 overflow-auto rounded-xl bg-white dark:bg-[#1C1C1E] p-2">
+            {document.chatMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                  message.role === 'user'
+                    ? 'ml-8 bg-violet-500 text-white'
+                    : 'mr-8 bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-100'
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{message.content}</p>
+                <p className={`mt-1 text-[10px] ${message.role === 'user' ? 'text-white/70' : 'text-gray-400'}`}>
+                  {message.role === 'user' ? t.you : t.aiAssistant} · {format(new Date(message.createdAt), 'MM-dd HH:mm')}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
         <textarea
           value={aiMessage}
           onChange={(event) => setAiMessage(event.target.value)}
@@ -848,9 +907,6 @@ function MarkdownDocumentPanel({
           {isChatting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
           {isChatting ? t.generating : t.askAi}
         </button>
-        {aiReply && (
-          <p className="mt-3 whitespace-pre-wrap rounded-xl bg-violet-50 dark:bg-violet-500/10 p-3 text-sm leading-relaxed text-gray-700 dark:text-gray-200">{aiReply}</p>
-        )}
       </div>
     </div>
   );
