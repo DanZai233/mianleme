@@ -479,7 +479,7 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
       chatMessages: previousMessages,
     };
     try {
-      const sections = ['overview', 'questions', 'deepDive', 'star', 'closing'];
+      const sections = ['overview', 'questionsA', 'questionsB', 'deepDiveA', 'deepDiveB', 'starA', 'starB', 'closing'];
       const sectionContent: Record<string, string> = Object.fromEntries(sections.map((section) => [section, '']));
       const composeContent = () => {
         const body = sections.map((section) => sectionContent[section].trim()).filter(Boolean).join('\n\n');

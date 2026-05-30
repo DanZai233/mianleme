@@ -369,14 +369,35 @@ function buildPrepPackSectionPrompt(sectionId: string, lang: "zh" | "en") {
 ## 4. 高频问题与答题要点
 
 要求：至少 10 个问题；每题给 2-3 个具体答题要点；必须覆盖 JD 关键词、简历亮点和岗位阶段。`,
+    questionsA: `生成 Markdown 准备包的高频问题章节前半部分，只输出这个章节开头和第 1-5 题，不要 JSON，不要代码块：
+## 4. 高频问题与答题要点
+
+要求：生成 5 个最重要问题；每题给 2-3 个具体答题要点；必须覆盖 JD 关键词、简历亮点和岗位阶段。`,
+    questionsB: `继续生成 Markdown 准备包的高频问题章节后半部分，只输出第 6-10 题，不要重复章节标题，不要 JSON，不要代码块。
+
+要求：生成 5 个和前半部分互补的问题；每题给 2-3 个具体答题要点；必须覆盖 JD 关键词、简历亮点和岗位阶段。`,
     deepDive: `生成 Markdown 准备包的深挖问题章节，只输出这个章节，不要 JSON，不要代码块：
 ## 5. 技术/业务深挖问题
 
 要求：至少 8 个深挖问题；每题给追问方向和准备要点；结合 JD、公司业务和面试官信息。`,
+    deepDiveA: `生成 Markdown 准备包的深挖问题章节前半部分，只输出这个章节开头和第 1-4 题，不要 JSON，不要代码块：
+## 5. 技术/业务深挖问题
+
+要求：生成 4 个高价值深挖问题；每题给追问方向和准备要点；结合 JD、公司业务和面试官信息。`,
+    deepDiveB: `继续生成 Markdown 准备包的深挖问题章节后半部分，只输出第 5-8 题，不要重复章节标题，不要 JSON，不要代码块。
+
+要求：生成 4 个和前半部分互补的深挖问题；每题给追问方向和准备要点；结合 JD、公司业务和面试官信息。`,
     star: `生成 Markdown 准备包的 STAR 案例库章节，只输出这个章节，不要 JSON，不要代码块：
 ## 6. STAR 案例库
 
 要求：至少 5 个案例；每个包含背景、行动、结果、可量化亮点、适用问题；必须优先使用简历片段。`,
+    starA: `生成 Markdown 准备包的 STAR 案例库前半部分，只输出这个章节开头和第 1-3 个案例，不要 JSON，不要代码块：
+## 6. STAR 案例库
+
+要求：生成 3 个最重要案例；每个包含背景、行动、结果、可量化亮点、适用问题；必须优先使用简历片段。`,
+    starB: `继续生成 Markdown 准备包的 STAR 案例库后半部分，只输出第 4-5 个案例，不要重复章节标题，不要 JSON，不要代码块。
+
+要求：生成 2 个和前半部分互补的案例；每个包含背景、行动、结果、可量化亮点、适用问题；必须优先使用简历片段。`,
     closing: `生成 Markdown 准备包最后 4 个章节，只输出这些章节，不要 JSON，不要代码块：
 ## 7. 可反问面试官的问题
 ## 8. 面试前 30 分钟检查清单
@@ -397,14 +418,35 @@ Requirements: deeply use interview details, JD, resume snapshot, company researc
 ## 4. Likely Questions and Answer Angles
 
 Requirements: at least 10 questions; each with 2-3 concrete answer bullets; cover JD keywords, resume proof, and interview stage.`,
+    questionsA: `Generate the first half of this Markdown prep-pack section. Output the heading and questions 1-5 only. Do not output JSON or a code fence:
+## 4. Likely Questions and Answer Angles
+
+Requirements: 5 important questions; each with 2-3 concrete answer bullets; cover JD keywords, resume proof, and interview stage.`,
+    questionsB: `Continue the same Markdown prep-pack section. Output questions 6-10 only; do not repeat the heading. Do not output JSON or a code fence.
+
+Requirements: 5 complementary questions; each with 2-3 concrete answer bullets; cover JD keywords, resume proof, and interview stage.`,
     deepDive: `Generate only this Markdown prep-pack section. Do not output JSON or a code fence:
 ## 5. Deep-Dive Technical / Business Questions
 
 Requirements: at least 8 deep-dive questions; each with follow-up angles and prep notes; use JD, company context, and interviewer info.`,
+    deepDiveA: `Generate the first half of this Markdown prep-pack section. Output the heading and questions 1-4 only. Do not output JSON or a code fence:
+## 5. Deep-Dive Technical / Business Questions
+
+Requirements: 4 high-value deep-dive questions; each with follow-up angles and prep notes; use JD, company context, and interviewer info.`,
+    deepDiveB: `Continue the same Markdown prep-pack section. Output questions 5-8 only; do not repeat the heading. Do not output JSON or a code fence.
+
+Requirements: 4 complementary deep-dive questions; each with follow-up angles and prep notes; use JD, company context, and interviewer info.`,
     star: `Generate only this Markdown prep-pack section. Do not output JSON or a code fence:
 ## 6. STAR Story Bank
 
 Requirements: at least 5 stories; each with situation, action, result, measurable proof, applicable questions; prioritize the resume snapshot.`,
+    starA: `Generate the first half of this Markdown prep-pack section. Output the heading and stories 1-3 only. Do not output JSON or a code fence:
+## 6. STAR Story Bank
+
+Requirements: 3 important stories; each with situation, action, result, measurable proof, applicable questions; prioritize the resume snapshot.`,
+    starB: `Continue the same Markdown prep-pack section. Output stories 4-5 only; do not repeat the heading. Do not output JSON or a code fence.
+
+Requirements: 2 complementary stories; each with situation, action, result, measurable proof, applicable questions; prioritize the resume snapshot.`,
     closing: `Generate only these final Markdown prep-pack sections. Do not output JSON or a code fence:
 ## 7. Questions to Ask the Interviewer
 ## 8. 30-Minute Pre-Interview Checklist
