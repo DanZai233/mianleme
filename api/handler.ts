@@ -305,6 +305,7 @@ function getServerAiConfig() {
 
 async function callModel(prompt: string, text: string, imageBase64?: string) {
   const { provider, apiKey, modelName, apiBase } = getServerAiConfig();
+  const maxOutputTokens = 3000;
 
   // Prepare contents
   let contents: any[] = [];
@@ -374,6 +375,7 @@ async function callModel(prompt: string, text: string, imageBase64?: string) {
       const response = await openai.chat.completions.create({
         model: modelName,
         messages: messages,
+        max_tokens: maxOutputTokens,
         temperature: 0,
         ...(provider === "openai" ? { response_format: { type: "json_object" as const } } : {}),
       });
@@ -417,7 +419,7 @@ async function callModel(prompt: string, text: string, imageBase64?: string) {
 
       const response = await anthropic.messages.create({
         model: modelName,
-        max_tokens: 4096,
+        max_tokens: maxOutputTokens,
         temperature: 0,
         messages: messages,
       });
@@ -487,17 +489,17 @@ const generatePrepPack = async (req: express.Request, res: express.Response) => 
     const lang = req.body?.lang === "en" ? "en" : "zh";
     const timezone = normalizeTimezone(req.body?.timezone);
     const prompt = lang === "zh"
-      ? `你是一个严谨、具体、可执行的求职面试教练。请根据面试信息生成一份尽可能详细的 Markdown 准备包，只返回 JSON。
+      ? `你是一个严谨、具体、可执行的求职面试教练。请根据面试信息生成一份详细但精炼的 Markdown 准备包，只返回 JSON。
 
 准备包必须包含这些 Markdown 章节：
 # 面试准备包
 ## 1. 面试信息摘要
 ## 2. 岗位能力画像
 ## 3. 公司/业务理解框架
-## 4. 高频问题与答题要点（至少 10 个）
-## 5. 技术/业务深挖问题（至少 8 个）
-## 6. STAR 案例库（至少 5 个，每个包含背景、行动、结果、可量化亮点）
-## 7. 可反问面试官的问题（至少 8 个，按 HR/技术/业务/团队分类）
+## 4. 高频问题与答题要点（10 个）
+## 5. 技术/业务深挖问题（8 个）
+## 6. STAR 案例库（5 个，每个包含背景、行动、结果、可量化亮点）
+## 7. 可反问面试官的问题（8 个，按 HR/技术/业务/团队分类）
 ## 8. 面试前 30 分钟检查清单
 ## 9. 风险点与补救话术
 ## 10. 会议/链接/备注核对
@@ -508,6 +510,8 @@ const generatePrepPack = async (req: express.Request, res: express.Response) => 
 - 深度结合公司、岗位、阶段、备注、岗位 JD、简历片段、公司研究、面试官信息、会议平台、面试时间和时区。
 - 把简历片段转成可讲述的 STAR 素材，并标出最适合回答哪些问题。
 - 如果 JD 或公司研究里出现明确技能/业务关键词，必须在能力画像和问题列表中覆盖。
+- 每条问题的答题要点控制在 2-3 个短 bullet，每个 STAR 案例控制在 4 行内。
+- 总长度控制在 1800-2600 个中文字符，优先保留最关键、最贴合这场面试的内容。
 - 输出 JSON only，不要 Markdown 代码块。
 
 输出格式：
@@ -515,17 +519,17 @@ const generatePrepPack = async (req: express.Request, res: express.Response) => 
   "title": "xxx 面试准备包",
   "content": "# 面试准备包\\n..."
 }`
-      : `You are a rigorous, specific, actionable interview coach. Generate a detailed Markdown prep pack from the interview data and return JSON only.
+      : `You are a rigorous, specific, actionable interview coach. Generate a detailed but concise Markdown prep pack from the interview data and return JSON only.
 
 The Markdown must include:
 # Interview Prep Pack
 ## 1. Interview Summary
 ## 2. Role Competency Map
 ## 3. Company / Business Understanding Framework
-## 4. Likely Questions and Answer Angles (at least 10)
-## 5. Deep-Dive Technical / Business Questions (at least 8)
-## 6. STAR Story Bank (at least 5, each with situation, action, result, measurable proof)
-## 7. Questions to Ask the Interviewer (at least 8, grouped by HR/technical/business/team)
+## 4. Likely Questions and Answer Angles (10)
+## 5. Deep-Dive Technical / Business Questions (8)
+## 6. STAR Story Bank (5, each with situation, action, result, measurable proof)
+## 7. Questions to Ask the Interviewer (8, grouped by HR/technical/business/team)
 ## 8. 30-Minute Pre-Interview Checklist
 ## 9. Risks and Recovery Talking Points
 ## 10. Meeting / Link / Notes Verification
@@ -536,6 +540,8 @@ Requirements:
 - Deeply use company, role, stage, notes, job description, resume snapshot, company research, interviewer info, platform, meeting time, and timezone.
 - Turn resume snippets into usable STAR material and label which questions each story can answer.
 - If the JD or company research contains explicit skill/business keywords, cover them in the competency map and question list.
+- Keep each question's answer angle to 2-3 short bullets and each STAR story within 4 lines.
+- Keep the full document around 1,200-1,800 English words, prioritizing the most relevant details.
 - Return JSON only. Do not wrap it in a Markdown fence.
 
 Output:
