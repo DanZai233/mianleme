@@ -479,64 +479,78 @@ function InterviewDetailsModal({ interview, lang, timezone, fullDate, calendarOp
       chatMessages: previousMessages,
     };
     try {
-      const response = await fetch(apiUrl('/api/generate-prep-pack-stream'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interview, lang, timezone }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || 'Failed to generate prep pack');
-      }
-      if (!response.body) throw new Error('Streaming is unavailable');
+      const sections = ['overview', 'questions', 'deepDive', 'star', 'closing'];
+      let accumulatedContent = `# ${lang === 'zh' ? '面试准备包' : 'Interview Prep Pack'}\n\n`;
+      onUpdate({ prepPackMarkdown: { ...currentDocument, content: accumulatedContent } });
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let finished = false;
-      let lastFlushAt = 0;
-      const flushDocument = (force = false) => {
-        const now = Date.now();
-        if (!force && now - lastFlushAt < 350) return;
-        lastFlushAt = now;
-        onUpdate({ prepPackMarkdown: currentDocument });
-      };
+      for (const sectionId of sections) {
+        let sectionContent = '';
+        const response = await fetch(apiUrl('/api/generate-prep-pack-stream'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interview, lang, timezone, sectionId }),
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.error || 'Failed to generate prep pack');
+        }
+        if (!response.body) throw new Error('Streaming is unavailable');
 
-      while (!finished) {
-        const { value, done } = await reader.read();
-        finished = done;
-        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finished = false;
+        let lastFlushAt = 0;
+        const flushDocument = (force = false) => {
+          const now = Date.now();
+          if (!force && now - lastFlushAt < 350) return;
+          lastFlushAt = now;
+          currentDocument = {
+            ...currentDocument,
+            content: `${accumulatedContent}${sectionContent}`,
+            updatedAt: new Date().toISOString(),
+          };
+          onUpdate({ prepPackMarkdown: currentDocument });
+        };
 
-        for (const rawEvent of events) {
-          if (!rawEvent.trim()) continue;
-          const { event, data } = parseSseEvent(rawEvent);
-          const payload = data ? JSON.parse(data) : {};
-          if (event === 'meta') {
-            currentDocument = {
-              ...currentDocument,
-              ...normalizeMarkdownResponse({ ...payload, content: currentDocument.content }, fallbackTitle),
-              chatMessages: previousMessages,
-            };
-            flushDocument(true);
-          } else if (event === 'delta') {
-            currentDocument = {
-              ...currentDocument,
-              content: `${currentDocument.content}${String(payload.delta || '')}`,
-              updatedAt: new Date().toISOString(),
-            };
-            flushDocument(false);
-          } else if (event === 'done') {
-            currentDocument = {
-              ...normalizeMarkdownResponse(payload.document, fallbackTitle),
-              chatMessages: previousMessages,
-            };
-            flushDocument(true);
-          } else if (event === 'error') {
-            throw new Error(payload.error || 'Failed to generate prep pack');
+        while (!finished) {
+          const { value, done } = await reader.read();
+          finished = done;
+          buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
+
+          for (const rawEvent of events) {
+            if (!rawEvent.trim()) continue;
+            const { event, data } = parseSseEvent(rawEvent);
+            const payload = data ? JSON.parse(data) : {};
+            if (event === 'meta') {
+              currentDocument = {
+                ...currentDocument,
+                title: String(payload.title || currentDocument.title),
+                generatedAt: String(payload.generatedAt || currentDocument.generatedAt),
+                updatedAt: String(payload.updatedAt || currentDocument.updatedAt),
+              };
+              flushDocument(true);
+            } else if (event === 'delta') {
+              sectionContent = `${sectionContent}${String(payload.delta || '')}`;
+              flushDocument(false);
+            } else if (event === 'done') {
+              sectionContent = String(payload.document?.content || sectionContent).trim();
+              flushDocument(true);
+            } else if (event === 'error') {
+              throw new Error(payload.error || 'Failed to generate prep pack');
+            }
           }
         }
+
+        accumulatedContent = `${accumulatedContent}${sectionContent.trim()}\n\n`;
+        currentDocument = {
+          ...currentDocument,
+          content: accumulatedContent.trim(),
+          updatedAt: new Date().toISOString(),
+        };
+        onUpdate({ prepPackMarkdown: currentDocument });
       }
       toast.success(t.aiPrepPack);
     } catch (error: any) {

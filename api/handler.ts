@@ -513,6 +513,72 @@ The Markdown must include:
 ## 10. Meeting / Link / Notes Verification`;
 }
 
+function buildPrepPackSectionPrompt(sectionId: string, lang: "zh" | "en") {
+  const zh: Record<string, string> = {
+    overview: `生成 Markdown 准备包的前 3 个章节，只输出这些章节，不要 JSON，不要代码块：
+## 1. 面试信息摘要
+## 2. 岗位能力画像
+## 3. 公司/业务理解框架
+
+要求：深度结合面试信息、JD、简历片段、公司研究和面试官信息；缺信息写“需要确认”并给确认方法。`,
+    questions: `生成 Markdown 准备包的高频问题章节，只输出这个章节，不要 JSON，不要代码块：
+## 4. 高频问题与答题要点
+
+要求：至少 10 个问题；每题给 2-3 个具体答题要点；必须覆盖 JD 关键词、简历亮点和岗位阶段。`,
+    deepDive: `生成 Markdown 准备包的深挖问题章节，只输出这个章节，不要 JSON，不要代码块：
+## 5. 技术/业务深挖问题
+
+要求：至少 8 个深挖问题；每题给追问方向和准备要点；结合 JD、公司业务和面试官信息。`,
+    star: `生成 Markdown 准备包的 STAR 案例库章节，只输出这个章节，不要 JSON，不要代码块：
+## 6. STAR 案例库
+
+要求：至少 5 个案例；每个包含背景、行动、结果、可量化亮点、适用问题；必须优先使用简历片段。`,
+    closing: `生成 Markdown 准备包最后 4 个章节，只输出这些章节，不要 JSON，不要代码块：
+## 7. 可反问面试官的问题
+## 8. 面试前 30 分钟检查清单
+## 9. 风险点与补救话术
+## 10. 会议/链接/备注核对
+
+要求：反问问题至少 8 个，按 HR/技术/业务/团队分类；检查清单和补救话术要可直接执行。`,
+  };
+
+  const en: Record<string, string> = {
+    overview: `Generate only these Markdown prep-pack sections. Do not output JSON or a code fence:
+## 1. Interview Summary
+## 2. Role Competency Map
+## 3. Company / Business Understanding Framework
+
+Requirements: deeply use interview details, JD, resume snapshot, company research, and interviewer info; mark missing facts as "to confirm" with confirmation methods.`,
+    questions: `Generate only this Markdown prep-pack section. Do not output JSON or a code fence:
+## 4. Likely Questions and Answer Angles
+
+Requirements: at least 10 questions; each with 2-3 concrete answer bullets; cover JD keywords, resume proof, and interview stage.`,
+    deepDive: `Generate only this Markdown prep-pack section. Do not output JSON or a code fence:
+## 5. Deep-Dive Technical / Business Questions
+
+Requirements: at least 8 deep-dive questions; each with follow-up angles and prep notes; use JD, company context, and interviewer info.`,
+    star: `Generate only this Markdown prep-pack section. Do not output JSON or a code fence:
+## 6. STAR Story Bank
+
+Requirements: at least 5 stories; each with situation, action, result, measurable proof, applicable questions; prioritize the resume snapshot.`,
+    closing: `Generate only these final Markdown prep-pack sections. Do not output JSON or a code fence:
+## 7. Questions to Ask the Interviewer
+## 8. 30-Minute Pre-Interview Checklist
+## 9. Risks and Recovery Talking Points
+## 10. Meeting / Link / Notes Verification
+
+Requirements: at least 8 interviewer questions grouped by HR/technical/business/team; make checklist and recovery talking points directly usable.`,
+  };
+
+  const sectionPrompt = (lang === "zh" ? zh : en)[sectionId];
+  if (!sectionPrompt) return "";
+  return `${sectionPrompt}
+
+${lang === "zh"
+  ? "基于给定面试上下文生成完整、具体、可执行的内容。不要重复已经生成过的章节。"
+  : "Generate complete, specific, actionable content from the provided interview context. Do not repeat previously generated sections."}`;
+}
+
 function markdownDocumentTitle(interview: any, lang: "zh" | "en", fallback: string) {
   const company = String(interview?.company || "").trim();
   const role = String(interview?.role || "").trim();
@@ -923,6 +989,7 @@ const generatePrepPackStream = async (req: express.Request, res: express.Respons
   const interview = req.body?.interview || {};
   const timezone = normalizeTimezone(req.body?.timezone);
   const title = markdownDocumentTitle(interview, lang, lang === "zh" ? "面试准备包" : "Interview Prep Pack");
+  const sectionId = String(req.body?.sectionId || "full");
 
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -934,8 +1001,9 @@ const generatePrepPackStream = async (req: express.Request, res: express.Respons
   writeSse(res, "meta", { generatedAt, updatedAt: generatedAt, title });
 
   try {
+    const prompt = buildPrepPackSectionPrompt(sectionId, lang) || buildFullPrepPackPrompt(lang);
     await streamTextModel(
-      buildFullPrepPackPrompt(lang),
+      prompt,
       JSON.stringify({ timezone, interview }, null, 2),
       async (delta) => {
         content += delta;
